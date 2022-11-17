@@ -1,0 +1,22 @@
+#
+# $FreeBSD$
+#
+# log commando's, netwerk en login/out voor root
+root:ex,nt,lo:no
+# log authenticatie/autorisatie, administratie, netwerk, succesvolle commando's en login/logout voor jasper
+jasper:aa,ad,ex,nt,lo:no
+# jasper:fc:lo:no
+# log commando's, netwerk en login/out voor lp
+lp:na,lo:no
+# Backup standard logging
+# jasper:lo:no
+# jasper:ap:io
+
+# Expirimental configs
+# jasper:fa,fc,fd,fm,fr,fw,ip,ap,no:io
+# jasper:aa,ad,ap,ex,ip,lo,nt,ot,pc:no,io,na
+
+# service logging
+#sshd:nt,ap,ex,:no
+#nobody:ap,ex:no
+#daemon:ap,ex:no

@@ -1,0 +1,4 @@
+header,56,11,audit startup,0,Thu Oct 14 09:08:22 2021, + 669 msec
+text,auditd::Audit startup
+return,success,0
+trailer,56

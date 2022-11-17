@@ -1,0 +1,14 @@
+header,56,11,audit startup,0,Tue Nov 16 09:08:16 2021, + 912 msec
+text,auditd::Audit startup
+return,success,0
+trailer,56
+header,97,11,su(1),0,Tue Nov 16 09:08:17 2021, + 5 msec
+subject,-1,root,wheel,root,wheel,905,905,0,0.0.0.0
+text,successful authentication
+return,success,0
+trailer,97
+header,97,11,su(1),0,Tue Nov 16 10:58:54 2021, + 419 msec
+subject,-1,root,wheel,root,wheel,3689,3689,0,0.0.0.0
+text,successful authentication
+return,success,0
+trailer,97
