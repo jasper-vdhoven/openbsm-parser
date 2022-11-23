@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from sys import argv, exit
-from dissect import cstruct
-from dissect.cstruct import dumpstruct
+from dissect.cstruct import cstruct, dumpstruct
 
 cdef = """
 /*
@@ -22,7 +21,7 @@ typedef struct au_tid64 {
 typedef struct au_tidaddr32 {
 	uint32_t	port;
 	uint32_t	type;
-	uint32_t	addr[4];
+	uint32_t	addr[type / 4];
 } au_tidaddr32_t;
 
 typedef struct au_tidaddr64 {
@@ -605,9 +604,25 @@ typedef struct {
 } au_trailer_t;
 """
 
+def read_nts_array(stream, count):
+    strings = []
+
+    for i in range(count):
+        buf = b""
+        cur = stream.read(1)
+
+        # check for end of string or end of stream
+        while cur != b'\x00' and cur != b'':
+            buf += cur
+            cur = stream.read(1)
+
+        strings.append(buf.decode())
+
+    return strings
+
+
 def main():
-    cs = cstruct.cstruct
-    aurecord = cs(endian='>')
+    aurecord = cstruct(endian='>')
     aurecord.load(cdef, compiled=True)
 
     if len(argv) != 2:
@@ -727,16 +742,28 @@ def main():
                 print("privstrlen: %s" % record_auprivt_privstrlen)
                 record_auprivt_priv = fh.read(record_auprivt_privstrlen)
                 print("priv: %s" % record_auprivt_priv)
-            #TODO: check whether dissect.cstruct properly parses this without hacky tricks 
             case b'\x3c':
+                # dirty hack, because cstruct does not support an array of null-terminated
+                # strings (yet)
                 print("\nType is AU_EXECARG_T")
-                au_execarg_t = aurecord.au_execarg_t(fh)
-                dumpstruct(au_execarg_t)
+
+                au_execarg_t_count = int.from_bytes(fh.read(4), "big")
+                au_execarg_t_text = read_nts_array(fh, au_execarg_t_count)
+
+                print("- count: {}".format(au_execarg_t_count))
+                print("- text[]:")
+                print("\n".join([ "  - " + x for x in au_execarg_t_text ]))
+
             #TODO: check whether dissect.cstruct properly parses this without hacky tricks
             case b'\x3d':
                 print("\nType is AU_EXECENV_T")
-                au_execenv_t = aurecord.au_execenv_t(fh)
-                dumpstruct(au_execenv_t)
+
+                au_execenv_t_count = int.from_bytes(fh.read(4), "big")
+                au_execenv_t_text = read_nts_array(fh, au_execenv_t_count)
+
+                print("- count: {}".format(au_execenv_t_count))
+                print("- text[]:")
+                print("\n".join([ "  - " + x for x in au_execenv_t_text ]))
             case b'\x3e':
                 print("\nType is AU_ATTR32_T")
                 au_attr32_t = aurecord.au_attr32_t(fh)
@@ -787,8 +814,8 @@ def main():
                 dumpstruct(au_header64_ex_t)
             case b'\x7a':
                 print("\nType is AU_SUBJECT32_EX_T")
-                au_subject32_ex_t = aurecord.au_subject32_ex_t(fh)
-                dumpstruct(au_subject32_ex_t)
+                au_subject32ex_t = aurecord.au_subject32ex_t(fh)
+                dumpstruct(au_subject32ex_t)
             case b'\x7b':
                 print("\nType is AU_PROC32_EXT_T")
                 au_proc32_ex_t = aurecord.au_proc32_ex_t(fh)
