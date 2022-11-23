@@ -617,7 +617,7 @@ def read_nts_array(stream, count: int):
 
     for i in range(count):
         buf = b""
-        cur = stream.read(1)
+        cur: bytes = stream.read(1)
 
         # check for end of string or end of stream
         while cur != b'\x00' and cur != b'':
