@@ -671,7 +671,8 @@ def main():
 
         match header_type:
             case b'\x00':
-                print("\n[+] Type is AU_INVALID_T")
+                token_type = "AU_INVALID_T"
+                print("\n[+] Type is %s" % token_type)
                 record_auinvalid_t_len = int.from_bytes(fh.read(2), "big")
                 record_auinvalid_t_text = fh.read(record_auinvalid_t_len)
                 record_class = Text_record(
@@ -679,29 +680,34 @@ def main():
                 print("len: %s \ntext: %s" % (record_auinvalid_t_len,
                                               record_auinvalid_t_text.decode("utf-8")))
             case b'\x13':
-                print("\n[+] Type is AU_TRAILER_T")
+                token_type = "AU_TRAILER_T"
+                print("\n[+] Type is %s" % token_type)
                 au_trailer_t = aurecord.au_trailer_t(fh)
                 print_items(au_trailer_t)
                 # dumpstruct(au_trailer_t)
                 print("="*21 + "END AUDIT RECORD" + "="*21)
             case b'\x14':
+                token_type = "AU_HEADER32_T"
                 print("="*20 + "START AUDIT RECORD" + "="*20)
-                print("\n[+] Type is AU_HEADER32_T")
+                print("\n[+] Type is %s" % token_type)
                 au_header32_t = aurecord.au_header32_t(fh)
                 print_items(au_header32_t)
                 # dumpstruct(au_header32_t)
             case b'\x15':
-                print("\n[+] Type is AU_HEADER32_EX_T")
+                token_type = "AU_HEADER32_EX_T"
+                print("\n[+] Type is %s" % token_type)
                 au_header32_ex_t = aurecord.au_header32_ex_t(fh)
                 print_items(au_header32_ex_t)
                 # dumpstruct(au_header32_ex_t)
             case b'\x22':
-                print("\n[+] Type is AUIPC_T")
+                token_type = "AUIPC_T"
+                print("\n[+] Type is %s" % token_type)
                 auipc_t = aurecord.auipc_t(fh)
                 print_items(auipc_t)
                 # dumpstruct(auipc_t)
             case b'\x23':
-                print("\n[+] Type is AU_PATH_T")
+                token_type = "AU_PATH_T"
+                print("\n[+] Type is %s" % token_type)
                 record_aupath_t_len = int.from_bytes(fh.read(2), "big")
                 record_aupath_t_text = fh.read(record_aupath_t_len)
                 record_class = Text_record(
@@ -709,22 +715,26 @@ def main():
                 print("len: %s \ntext: %s\ndecoded: %s" % (
                     record_aupath_t_len, record_aupath_t_text, record_aupath_t_text.decode("utf-8")))
             case b'\x24':
-                print("\n[+] Type is AU_SUBJECT32_T")
+                token_type = "AU_SUBJECT32_T"
+                print("\n[+] Type is %s" % token_type)
                 au_subject32_t = aurecord.au_subject32_t(fh)
                 print_items(au_subject32_t)
                 # dumpstruct(au_subject32_t)
             case b'\x26':
-                print("\n[+] Type is AU_PROC32_T")
+                token_type = "AU_PROC32_T"
+                print("\n[+] Type is %s" % token_type)
                 au_proc32_t = aurecord.au_proc32_t(fh)
                 print_items(au_proc32_t)
                 # dumpstruct(au_proc32_t)
             case b'\x27':
-                print("\n[+] Type is AU_RET32_T")
+                token_type = "AU_RET32_T"
+                print("\n[+] Type is %s" % token_type)
                 au_ret32_t = aurecord.au_ret32_t(fh)
                 print_items(au_ret32_t)
                 # dumpstruct(au_ret32)
             case b'\x28':
-                print("\n[+] Type is AU_TEXT_T")
+                token_type = "AU_TEXT_T"
+                print("\n[+] Type is %s" % token_type)
                 record_autext_t_len = int.from_bytes(fh.read(2), "big")
                 record_autext_t_text = fh.read(record_autext_t_len)
                 record_class = Text_record(
@@ -732,28 +742,33 @@ def main():
                 print("- len: %s\n- text: %s" %
                       (record_autext_t_len, record_autext_t_text.decode("utf-8")))
             case b'\x29':
-                print("\n[+] Type is AU_OPAQUE_T")
+                token_type = "AU_OPAQUE_T"
+                print("\n[+] Type is %s" % token_type)
                 record_auopaque_t_len = int.from_bytes(fh.read(2), "big")
                 record_auopaque_t_text = fh.read(record_auopaque_t_len)
                 print("len: %s \ntext: %s" % (record_auopaque_t_len,
                                               record_auopaque_t_text.decode("utf-8")))
             case b'\x2a':
-                print("\n[+] Type is AUINADDR_T")
+                token_type = "AUINADDR_T"
+                print("\n[+] Type is %s" % token_type)
                 auinaddr_t = aurecord.auinaddr_t(fh)
                 print_items(auinaddr_t)
                 # dumpstruct(auinaddr_t)
             case b'\x2b':
-                print("\n[+] Type is AUIP_T")
+                token_type = "AUIP_T"
+                print("\n[+] Type is %s" % token_type)
                 auip_t = aurecord.auip_t(fh)
                 print_items(auip_t)
                 # dumpstruct(auip_t)
             case b'\x2c':
-                print("\n[+] Type is AUIPORT_T")
+                token_type = "AUIPORT_T"
+                print("\n[+] Type is %s" % token_type)
                 auiport_t = aurecord.auiport_t(fh)
                 print_items(auiport_t)
                 # dumpstruct(auiport_t)
             case b'\x2d':
-                print("\n[+] Type is AU_ARG32_T")
+                token_type = "AU_ARG32_T"
+                print("\n[+] Type is %s" % token_type)
                 record_auarg32t_no = fh.read(1)
                 record_auarg32t_val = int.from_bytes(fh.read(4), "big")
                 record_auarg32t_len = int.from_bytes(fh.read(2), "big")
@@ -762,41 +777,48 @@ def main():
                 print("- no: %s\n- val: %s\n- len: %s\n- text: %s" % (record_auarg32t_no,
                       record_auarg32t_val, record_auarg32t_len, record_auarg32t_text))
             case b'\x2e':
-                print("\n[+] Type is AU_SOCKET_T")
+                token_type = "AU_SOCKET_T"
+                print("\n[+] Type is %s" % token_type)
                 au_socket_t = aurecord.au_socket_t(fh)
                 print_items(au_socket_t)
                 # dumpstruct(au_socket_t)
             case b'\x2f':
-                print("\n[+] Type is AU_SEQ_T")
+                token_type = "AU_SEQ_T"
+                print("\n[+] Type is %s" % token_type)
                 au_seq_t = aurecord.au_seq_t(fh)
                 print_items(au_seq_t)
                 # dumpstruct(au_seq_t)
             case b'\x31':
-                print("\n[+] Type is AU_ATTR_T")
+                token_type = "AU_ATTR_T"
+                print("\n[+] Type is %s" % token_type)
                 au_attr_t = aurecord.au_attr_t(fh)
                 print_items(au_attr_t)
                 # dumpstruct(au_attr_t)
             case b'\x32':
-                print("\n[+] Type is AUIPCPERM_T")
+                token_type = "AUIPCPERM_T"
+                print("\n[+] Type is %s")
                 auipcperm_t = aurecord.auipcperm_t(fh)
                 print_items(auipcperm_t)
                 # dumpstruct(auipcperm_t)
             case b'\x34':
-                print("\n[+] Type is AU_GROUPS_T")
+                token_type = "AU_PRIV_T"
+                print("\n[+] Type is %s" % token_type)
                 au_groups_t = aurecord.au_groups_t(fh)
                 print_items(au_groups_t)
                 # dumpstruct(au_groups_t)
             case b'\x38':
-                print("\n[+] Type is AU_PRIV_T")
+                token_type = "AU_PRIV_T"
+                print("\n[+] Type is: %s")
                 record_auprivt_sorf = int.from_bytes(fh.read(1), "big")
                 record_auprivt_privstrlen = int.from_bytes(fh.read(2), "big")
                 record_auprivt_priv = fh.read(record_auprivt_privstrlen)
                 print("sorf: %s\nprivstrlen: %s\npriv: %s" % (
                     record_auprivt_sorf, record_auprivt_privstrlen, record_auprivt_priv))
             case b'\x3c':
+                token_type = "AU_EXECARG_T"
                 # dirty hack, because cstruct does not support an array of null-terminated
                 # strings (yet)
-                print("\n[+] Type is AU_EXECARG_T")
+                print("\n[+] Type is: %s")
 
                 au_execarg_t_count = int.from_bytes(fh.read(4), "big")
                 au_execarg_t_text = read_nts_array(fh, au_execarg_t_count)
@@ -804,10 +826,9 @@ def main():
                 print("- count: {}".format(au_execarg_t_count))
                 print("- text[]:")
                 print("\n".join(["  - " + x for x in au_execarg_t_text]))
-
-            # TODO: check whether dissect.cstruct properly parses this without hacky tricks
             case b'\x3d':
-                print("\n[+] Type is AU_EXECENV_T")
+                token_type = "AU_EXECENV_T"
+                print("\n[+] Type is %s" % token_type)
 
                 au_execenv_t_count = int.from_bytes(fh.read(4), "big")
                 au_execenv_t_text = read_nts_array(fh, au_execenv_t_count)
@@ -816,24 +837,28 @@ def main():
                 print("- text[]:")
                 print("\n".join(["  - " + x for x in au_execenv_t_text]))
             case b'\x3e':
-                print("\n[+] Type is AU_ATTR32_T")
+                token_type = "AU_ATTR32_t"
+                print("\n[+] Type is %s" % token_type)
                 au_attr32_t = aurecord.au_attr32_t(fh)
                 print_items(au_attr32_t)
                 # dumpstruct(au_attr32_t)
             case b'\x52':
-                print("\n[+] Type is AU_EXIT_T")
+                token_type = "AU_EXIT_T"
+                print("\n[+] Type is %s" % token_type)
                 au_exit_t = aurecord.au_exit_t(fh)
                 print_items(au_exit_t)
                 # dumpstruct(au_exit_t)
             case b'\x60':
-                print("\n[+] Type is AU_ZONENAME_T")
+                token_type = "AU_ZONENAME_T"
+                print("\n[+] Type is %s" % token_type)
                 record_auzonenamet_len = int.from_bytes(fh.read(2), "big")
                 record_auzonenamet_zonename = fh.read(record_auzonenamet_len)
                 record_class = Text_record(token_type.lower(),record_auzonenamet_len,record_auzonenamet_zonename)
                 print("len: %s\nzonename: %s" %
                       (record_auzonenamet_len, record_auzonenamet_zonename))
             case b'\x71':
-                print("\n[+] Type is AU_ARG64_T")
+                token_type = "AU_ARG64_T"
+                print("\n[+] Type is %s" % token_type)
                 record_auarg64t_no = fh.read(1)
                 record_auarg64t_val = int.from_bytes(fh.read(8), "big")
                 record_auarg64t_len = int.from_bytes(fh.read(2), "big")
@@ -843,65 +868,76 @@ def main():
                 print("no: %s\nval: %s\nlen: %s\ntext: %s" % (
                     record_auarg64t_no, record_auarg64t_val, record_auarg64t_len, record_arg64t_text))
             case b'\x72':
-                print("\n[+] Type is AU_RET64_T")
+                token_type = "AU_RET64_T"
+                print("\n[+] Type is %s" % token_type)
                 au_ret64_t = aurecord.au_ret64_t(fh)
                 print_items(au_ret64_t)
                 # dumpstruct(au_ret64_t)
             case b'\x73':
-                print("\n[+] Type is AU_ATTR64_T")
+                token_type = "AU_ATTR64_T"
+                print("\n[+] Type is %s" % token_type)
                 au_attr64_t = aurecord.au_attr64_t(fh)
                 print_items(au_attr64_t)
                 # dumpstruct(au_attr64_t)
             case b'\x74':
-                print("\n[+] Type is AU_HEADER64_T")
+                token_type = "AU_HEADER64_t"
+                print("\n[+] Type is %s" % token_type)
                 au_header64_t = aurecord.au_header64_t(fh)
                 print_items(au_header64_t)
                 # dumpstruct(au_header64_t)
             case b'\x75':
-                print("\n[+] Type is AU_SUBJECT64_T")
+                token_type = "AU_SUBJECT64_T"
+                print("\n[+] Type is %s" % token_type)
                 au_subject64_t = aurecord.au_subject64_t(fh)
                 print_items(au_subject64_t)
                 # dumpstruct(au_subject64_t)
             case b'\x77':
-                print("\n[+] Type is AU_PROCESS64_T")
+                token_type = "AU_PROCESS64_T"
+                print("\n[+] Type is %s" % token_type)
                 au_proc64_t = aurecord.au_proc64_t(fh)
                 print_items(au_proc64_t)
                 # dumpstruct(au_proc64_t)
             case b'\x79':
-                print("\n[+] Type is AU_HEADER64_EX_T")
+                token_type = "AU_HEADER64_EX_T"
+                print("\n[+] Type is %s" % token_type)
                 au_header64_ex_t = aurecord.au_header64_ex_t(fh)
                 print_items(au_header64_ex_t)
                 # dumpstruct(au_header64_ex_t)
             case b'\x7a':
-                print("\n[+] Type is AU_SUBJECT32EX_T")
+                token_type = "AU_SUBJECT32EX_T"
+                print("\n[+] Type is %s" % token_type)
                 au_subject32ex_t = aurecord.au_subject32ex_t(fh)
                 print_items(au_subject32ex_t)
                 # dumpstruct(au_subject32ex_t)
             case b'\x7b':
-                print("\n[+] Type is AU_PROC32EXT_T")
+                token_type = "AU_PROC32EXT_T"
+                print("\n[+] Type is %s" % token_type)
                 au_proc32ex_t = aurecord.au_proc32ex_t(fh)
                 print_items(au_proc32ex_t)
                 # dumpstruct(au_proc32ex_t)
             case b'\x7c':
-                print("\n[+] Type is AU_SUBJECT64EX_T")
+                token_type = "AU_SUBJECT64EX_T"
+                print("\n[+] Type is %s" % token_type)
                 au_subject64ex_t = aurecord.au_subject64ex_t(fh)
                 print_items(au_subject64ex_t)
                 # dumpstruct(au_subject64ex_t)
             case b'\x7d':
-                print("\n[+] Type is AU_PROC64EX_T")
+                token_type = "AU_PROC64EX_T"
+                print("\n[+] Type is %s" % token_type)
                 au_proc64ex_t = aurecord.au_proc64ex_t(fh)
                 print_items(au_proc64ex_t)
                 # dumpstruct(au_proc64ex_t)
             case b'\x7e':
-                print("\n[+] Type is AUINADDR_EX_T")
+                token_type = "AUINADDR_EX_T"
+                print("\n[+] Type is %s" % token_type)
                 auinaddr_ex_t = aurecord.auinaddr_ex_t(fh)
                 print_items(auinaddr_ex_t)
                 # dumpstruct(auinaddr_ex_t)
             case b'':
-                print("\nEnd of File reached")
+                print("\nEnd of File reached!\nExiting...")
                 not_empty = False
             case _:
-                print("\ninvalid record type %s" % header_type)
+                print("\n!invalid record type! %s" % header_type)
                 not_empty = False
 
 
