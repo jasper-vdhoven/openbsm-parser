@@ -606,7 +606,7 @@ typedef struct {
 
 
 def print_items(parsed_record):
-    # Get the inidivual items inside each audit token, similar to how dissect's dumpstruct does
+    # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
     for item in parsed_record._type.fields:
         value = getattr(parsed_record, item.name)
         print("- %s: %s" % (item.name, value))
