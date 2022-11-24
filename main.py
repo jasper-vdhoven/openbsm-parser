@@ -2,6 +2,28 @@
 from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
 
+#TODO: Figure out what to do with these
+class Text_record:
+    def __init__(self, type:str, len: int, text):
+        self.type:str = type
+        self.len = len
+        self.text = text
+
+    def __repr__(self):
+        return f"<{self.type} len={self.len}, text={self.text}>"
+
+
+class Arg_record:
+    def __init__(self,type:str, no, val:int, len:int, text):
+        self.type = type
+        self.no = no
+        self.val = val
+        self.len = len
+        self.text = text
+    
+    def __repr__(self) -> str:
+        return f"<{self.type} no={self.no}, val={self.val}, len={self.len}, text={self.text}>"
+
 cdef = """
 /*
  * Structs pulled from https://github.com/openbsm/openbsm/blob/54a0c07cf8bac71554130e8f6760ca68e5f36c7f/bsm/libbsm.h
@@ -652,6 +674,8 @@ def main():
                 print("\n[+] Type is AU_INVALID_T")
                 record_auinvalid_t_len = int.from_bytes(fh.read(2), "big")
                 record_auinvalid_t_text = fh.read(record_auinvalid_t_len)
+                record_class = Text_record(
+                    token_type.lower(), record_auinvalid_t_len, record_auinvalid_t_text)
                 print("len: %s \ntext: %s" % (record_auinvalid_t_len,
                                               record_auinvalid_t_text.decode("utf-8")))
             case b'\x13':
@@ -680,8 +704,10 @@ def main():
                 print("\n[+] Type is AU_PATH_T")
                 record_aupath_t_len = int.from_bytes(fh.read(2), "big")
                 record_aupath_t_text = fh.read(record_aupath_t_len)
-                print("len: %s \ntext: %s" % (record_aupath_t_len,
-                                              record_aupath_t_text.decode("utf-8")))
+                record_class = Text_record(
+                    token_type.lower(), record_aupath_t_len, record_aupath_t_text)
+                print("len: %s \ntext: %s\ndecoded: %s" % (
+                    record_aupath_t_len, record_aupath_t_text, record_aupath_t_text.decode("utf-8")))
             case b'\x24':
                 print("\n[+] Type is AU_SUBJECT32_T")
                 au_subject32_t = aurecord.au_subject32_t(fh)
@@ -701,8 +727,10 @@ def main():
                 print("\n[+] Type is AU_TEXT_T")
                 record_autext_t_len = int.from_bytes(fh.read(2), "big")
                 record_autext_t_text = fh.read(record_autext_t_len)
-                print("- len: %s \n- text: %s" % (record_autext_t_len,
-                                                  record_autext_t_text[:-1].decode("utf-8")))
+                record_class = Text_record(
+                    token_type.lower(), record_autext_t_len, record_autext_t_text)
+                print("- len: %s\n- text: %s" %
+                      (record_autext_t_len, record_autext_t_text.decode("utf-8")))
             case b'\x29':
                 print("\n[+] Type is AU_OPAQUE_T")
                 record_auopaque_t_len = int.from_bytes(fh.read(2), "big")
@@ -730,6 +758,7 @@ def main():
                 record_auarg32t_val = int.from_bytes(fh.read(4), "big")
                 record_auarg32t_len = int.from_bytes(fh.read(2), "big")
                 record_auarg32t_text = fh.read(record_auarg32t_len)
+                record_class = Arg_record(token_type.lower(),record_auarg32t_no,record_auarg32t_val,record_auarg32t_len,record_auarg32t_text)
                 print("- no: %s\n- val: %s\n- len: %s\n- text: %s" % (record_auarg32t_no,
                       record_auarg32t_val, record_auarg32t_len, record_auarg32t_text))
             case b'\x2e':
@@ -800,6 +829,7 @@ def main():
                 print("\n[+] Type is AU_ZONENAME_T")
                 record_auzonenamet_len = int.from_bytes(fh.read(2), "big")
                 record_auzonenamet_zonename = fh.read(record_auzonenamet_len)
+                record_class = Text_record(token_type.lower(),record_auzonenamet_len,record_auzonenamet_zonename)
                 print("len: %s\nzonename: %s" %
                       (record_auzonenamet_len, record_auzonenamet_zonename))
             case b'\x71':
@@ -807,8 +837,9 @@ def main():
                 record_auarg64t_no = fh.read(1)
                 record_auarg64t_val = int.from_bytes(fh.read(8), "big")
                 record_auarg64t_len = int.from_bytes(fh.read(2), "big")
-                record_arg64t_text = read_nts_array(fh, record_auarg64t_len)
-                # record_arg64t_text = fh.read(record_arg64t_len)
+                record_auarg64t_text = read_nts_array(fh, record_auarg64t_len)
+                record_class = Arg_record(token_type,record_auarg64t_no,record_auarg64t_val,record_auarg64t_len,record_auarg64t_text)
+
                 print("no: %s\nval: %s\nlen: %s\ntext: %s" % (
                     record_auarg64t_no, record_auarg64t_val, record_auarg64t_len, record_arg64t_text))
             case b'\x72':
