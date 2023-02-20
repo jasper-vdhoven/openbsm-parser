@@ -62,14 +62,18 @@ typedef struct {
 	uchar		 no;
 	uint32_t	 val;
 	uint16_t	 len;
-	char		*text;
+	// changed type char *text to play nice with Dissect parsing
+    char         text[len-1];
+    char         nbt;
 } au_arg32_t;
 
 typedef struct {
 	uchar		 no;
 	uint64_t	 val;
 	uint16_t	 len;
-	char		*text;
+	// changed type char *text to play nice with Dissect parsing
+    char         text[len-1];
+    char         nbt;
 } au_arg64_t;
 
 /*
@@ -131,7 +135,8 @@ typedef struct {
  */
 typedef struct {
 	uint32_t	 count;
-	char		*text[AUDIT_MAX_ARGS];
+    // type is changed from char *text[AUDIT_MAX_ARGS]; to play nice with Dissect parsing
+	char		text[count][];
 } au_execarg_t;
 
 /*
@@ -140,7 +145,8 @@ typedef struct {
  */
 typedef struct {
 	uint32_t	 count;
-	char		*text[AUDIT_MAX_ENV];
+    // type is changed from char *text[AUDIT_MAX_ENV]; to play nice with Dissect parsing
+	char		text[count][];
 } au_execenv_t;
 
 /*
@@ -172,7 +178,8 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	no;
-	uint32_t	list[AUDIT_MAX_GROUPS];
+    // type is changed from u_int32_t list[AUDIT_MAX_GROUPS] to play nice with Dissect parsing
+	uint32_t	list[no][];
 } au_groups_t;
 
 /*
@@ -315,7 +322,9 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	 size;
-	char		*data;
+	// changed type from char *data to play nice with Dissect parsing
+    char         data[size-1];
+    char         nbt;
 } au_opaque_t;
 
 /*
@@ -324,7 +333,9 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	 len;
-	char		*path;
+	// changed type char *path to play nice with Dissect parsing
+    char         path[len-1];
+    char         nbt;
 } au_path_t;
 
 /*
@@ -347,7 +358,9 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tid32_t	tid;
+	// commented out to aid printing struct au_tid32_t tid;
+    uint32_t	tid_port;
+	uint32_t	tid_addr;
 } au_proc32_t;
 
 typedef struct {
@@ -358,7 +371,9 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tid64_t	tid;
+	// commented out to aid printing struct au_tid64_t tid;
+    uint64_t	tid_port;
+	uint32_t	tid_addr;
 } au_proc64_t;
 
 /*
@@ -511,7 +526,9 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tid32_t	tid;
+	// commented out to aid displaying struct au_tid32_t tid;
+    uint32_t	tid_port;
+	uint32_t	tid_addr;
 } au_subject32_t;
 
 typedef struct {
@@ -522,7 +539,9 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tid64_t	tid;
+	// commented out to aid printing struct au_tid64_t tid;
+    uint64_t	tid_port;
+	uint32_t	tid_addr;
 } au_subject64_t;
 
 /*
@@ -566,7 +585,9 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	 len;
-	char		*text;
+    // changed type from char *text to play nice with dissect parsing
+	char		 text[len-1];
+    char         nbt;
 } au_text_t;
 
 /*
@@ -577,7 +598,9 @@ typedef struct {
 typedef struct {
 	uint8_t	 sorf;
 	uint16_t	 privstrlen;
-	char		*priv;
+	// changed type char *priv to play nice with Dissect parsing
+    char         priv[privstrlen-1];
+    char         nbt;
 } au_priv_t;
 
 /*
@@ -600,7 +623,9 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	 len;
-	char		*zonename;
+	// changed type char *zonename to play nice witd Dissect parsing
+    char         zonename[len-1];
+    char         nbt;
 } au_zonename_t;
 
 typedef struct {
@@ -613,7 +638,9 @@ typedef struct {
 
 typedef struct {
 	uint16_t	 length;
-	char		*data;
+	// changed type char *data to play nice with Dissect parsing
+    char         data[length-1];
+    char         nbt;
 } auinvalid_t;
 
 /*
