@@ -653,30 +653,11 @@ typedef struct {
 } au_trailer_t;
 """
 
-
 def print_items(parsed_record):
     # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
     for item in parsed_record._type.fields:
         value = getattr(parsed_record, item.name)
         print("- %s: %s" % (item.name, value))
-
-
-def read_nts_array(stream, count: int):
-    strings: list[str | None] = []
-
-    for i in range(count):
-        buf = b""
-        cur: bytes = stream.read(1)
-
-        # check for end of string or end of stream
-        while cur != b'\x00' and cur != b'':
-            buf += cur
-            cur = stream.read(1)
-
-        strings.append(buf.decode())
-
-    return strings
-
 
 def main():
     aurecord = cstruct(endian='>')
