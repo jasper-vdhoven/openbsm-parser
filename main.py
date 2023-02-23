@@ -4,9 +4,6 @@ from dissect.cstruct import cstruct, dumpstruct
 
 import xml.etree.cElementTree as ET
 
-# import lxml.etree
-# import lxml.builder
-
 cdef = """
 /*
  * Structs pulled from https://github.com/openbsm/openbsm/blob/54a0c07cf8bac71554130e8f6760ca68e5f36c7f/bsm/libbsm.h
@@ -655,7 +652,6 @@ def main():
     aurecord.load(cdef, compiled=True)
 
     # XML doc definitions
-    # xml = ET.Element("?xml version='1.0' ?")
     audit = ET.Element("audit")
 
     if len(argv) != 2:
@@ -824,22 +820,11 @@ def main():
                 print_items(au_seq_t)
                 # dumpstruct(au_seq_t)
             case b"\x31":
-                token_type = "AU_ATTR32_T"
-                print("\n[+] Type is %s" % token_type)
-                au_attr32_t = aurecord.au_attr32_t(fh)
-                print_items(au_attr32_t)
+                token_type = "AU_ATTR_T"
+                print("[+] Type is %s" % token_type)
+                au_attr_t = aurecord.au_attr_t(fh)
+                print_items(au_attr_t)
 
-                ET.SubElement(
-                    record,
-                    "attribute",
-                    mode=str(au_attr32_t.mode),
-                    uid=str(au_attr32_t.uid),
-                    gid=str(au_attr32_t.gid),
-                    fsid=str(au_attr32_t.fsid),
-                    nodeid=str(au_attr32_t.nid),
-                    device=str(au_attr32_t.dev),
-                )
-                print("[!] Should've added an XML element to the doc at this point")
                 # dumpstruct(au_attr32_t)
             case b"\x32":
                 token_type = "AUIPCPERM_T"
@@ -863,19 +848,43 @@ def main():
                 token_type = "AU_EXECARG_T"
                 print("\n[+] Type is: %s", token_type)
                 au_execarg_t = aurecord.au_execarg_t(fh)
-                print_items(au_execarg_t)
+                # print_items(au_execarg_t)
+
+                au_execarg = ET.SubElement(record, "exec_args")
+                for items in au_execarg_t.text:
+                    arg = ET.SubElement(au_execarg, "arg")
+                    arg.text = items.decode("utf-8")
                 # dumpstruct(au_execarg_t)
             case b"\x3d":
                 token_type = "AU_EXECENV_T"
                 print("\n[+] Type is %s" % token_type)
                 au_execenv_t = aurecord.au_execenv_t(fh)
-                print_items(au_execenv_t)
+                # print_items(au_execenv_t)
+
+                au_execenv = ET.SubElement(record, "exec_env")
+                for items in au_execenv_t.text:
+                    arg = ET.SubElement(au_execenv, "env")
+                    arg.text = items.decode("utf-8")
+
+                # print(ET.tostring(audit, method="xml").decode("utf-8"))
                 # dumpstruct(au_execenv_t)
             case b"\x3e":
                 token_type = "AU_ATTR32_t"
                 print("\n[+] Type is %s" % token_type)
                 au_attr32_t = aurecord.au_attr32_t(fh)
-                print_items(au_attr32_t)
+                # print_items(au_attr32_t)
+
+                ET.SubElement(
+                    record,
+                    "attribute",
+                    mode=str(au_attr32_t.mode),
+                    uid=str(au_attr32_t.uid),
+                    gid=str(au_attr32_t.gid),
+                    fsid=str(au_attr32_t.fsid),
+                    nodeid=str(au_attr32_t.nid),
+                    device=str(au_attr32_t.dev),
+                )
+
                 # dumpstruct(au_attr32_t)
             case b"\x52":
                 token_type = "AU_EXIT_T"
