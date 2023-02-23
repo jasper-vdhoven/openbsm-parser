@@ -2,6 +2,10 @@
 from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
 
+import xml.etree.cElementTree as ET
+# import lxml.etree
+# import lxml.builder
+
 #TODO: Figure out what to do with these
 class Text_record:
     def __init__(self, type:str, len: int, text):
