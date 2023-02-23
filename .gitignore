@@ -1,3 +1,7 @@
 .venv310
 .venv311
 .vscode
+*.xml
+output_log
+example-logs
+new-example-logs/
