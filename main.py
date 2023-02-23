@@ -3,30 +3,9 @@ from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
 
 import xml.etree.cElementTree as ET
+
 # import lxml.etree
 # import lxml.builder
-
-#TODO: Figure out what to do with these
-class Text_record:
-    def __init__(self, type:str, len: int, text):
-        self.type:str = type
-        self.len = len
-        self.text = text
-
-    def __repr__(self):
-        return f"<{self.type} len={self.len}, text={self.text}>"
-
-
-class Arg_record:
-    def __init__(self,type:str, no, val:int, len:int, text):
-        self.type = type
-        self.no = no
-        self.val = val
-        self.len = len
-        self.text = text
-    
-    def __repr__(self) -> str:
-        return f"<{self.type} no={self.no}, val={self.val}, len={self.len}, text={self.text}>"
 
 cdef = """
 /*
@@ -569,7 +548,10 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tidaddr32_t	tid;
+	// commented out to aid printing struct au_tidaddr32_t tid;
+    uint32_t	port;
+    uint32_t	type;
+    uint32_t	addr[type / 4];
 } au_subject32ex_t;
 
 typedef struct {
@@ -580,7 +562,10 @@ typedef struct {
 	uint32_t	rgid;
 	uint32_t	pid;
 	uint32_t	sid;
-	au_tidaddr64_t	tid;
+	// commented out to aid printing struct au_tidaddr64_t tid;
+	uint64_t	port;
+	uint32_t	type;
+	uint32_t	addr[4];
 } au_subject64ex_t;
 
 /*
@@ -657,21 +642,27 @@ typedef struct {
 } au_trailer_t;
 """
 
+
 def print_items(parsed_record):
     # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
     for item in parsed_record._type.fields:
         value = getattr(parsed_record, item.name)
         print("- %s: %s" % (item.name, value))
 
+
 def main():
-    aurecord = cstruct(endian='>')
+    aurecord = cstruct(endian=">")
     aurecord.load(cdef, compiled=True)
+
+    # XML doc definitions
+    # xml = ET.Element("?xml version='1.0' ?")
+    audit = ET.Element("audit")
 
     if len(argv) != 2:
         exit("usage: main.py <audit_trail>")
 
     try:
-        fh = open(argv[1], 'rb')
+        fh = open(argv[1], "rb")
     except FileNotFoundError:
         raise
 
@@ -682,243 +673,310 @@ def main():
         header_type = fh.read(1)
 
         match header_type:
-            case b'\x00':
+            case b"\x00":
                 token_type = "AUINVALID_T"
                 print("\n[+] Type is %s" % token_type)
                 auinvalid_t = aurecord.auinvalid_t(fh)
                 print_items(auinvalid_t)
                 # dumpstruct(auinvalid_t)
-            case b'\x13':
+            case b"\x13":
                 token_type = "AU_TRAILER_T"
                 print("\n[+] Type is %s" % token_type)
                 au_trailer_t = aurecord.au_trailer_t(fh)
-                print_items(au_trailer_t)
+                # print_items(au_trailer_t)
                 # dumpstruct(au_trailer_t)
-                print("="*21 + "END AUDIT RECORD" + "="*21)
-            case b'\x14':
+                print("=" * 21 + "END AUDIT RECORD" + "=" * 21)
+            case b"\x14":
                 token_type = "AU_HEADER32_T"
-                print("="*20 + "START AUDIT RECORD" + "="*20)
+                print("=" * 20 + "START AUDIT RECORD" + "=" * 20)
                 print("\n[+] Type is %s" % token_type)
                 au_header32_t = aurecord.au_header32_t(fh)
-                print_items(au_header32_t)
+
+                record = ET.SubElement(
+                    audit,
+                    "record",
+                    version=str(au_header32_t.version),
+                    event=str(au_header32_t.e_type),
+                    modifier=str(au_header32_t.e_mod),
+                    time=str(au_header32_t.s),
+                    msec=str(au_header32_t.ms),
+                )
+                # print_items(au_header32_t)
                 # dumpstruct(au_header32_t)
-            case b'\x15':
+            case b"\x15":
                 token_type = "AU_HEADER32_EX_T"
                 print("\n[+] Type is %s" % token_type)
                 au_header32_ex_t = aurecord.au_header32_ex_t(fh)
-                print_items(au_header32_ex_t)
+                # print_items(au_header32_ex_t)
                 # dumpstruct(au_header32_ex_t)
-            case b'\x22':
+            case b"\x22":
                 token_type = "AUIPC_T"
                 print("\n[+] Type is %s" % token_type)
                 auipc_t = aurecord.auipc_t(fh)
                 print_items(auipc_t)
                 # dumpstruct(auipc_t)
-            case b'\x23':
+            case b"\x23":
                 token_type = "AU_PATH_T"
                 print("\n[+] Type is %s" % token_type)
                 au_path_t = aurecord.au_path_t(fh)
                 print_items(au_path_t)
+
+                au_path = ET.SubElement(record, "path")
+                au_path.text = au_path_t.path.decode("utf-8")
                 # dumpstruct(au_path_t)
-            case b'\x24':
+            case b"\x24":
                 token_type = "AU_SUBJECT32_T"
                 print("\n[+] Type is %s" % token_type)
                 au_subject32_t = aurecord.au_subject32_t(fh)
-                print_items(au_subject32_t)
+
+                ET.SubElement(
+                    record,
+                    "subject",
+                    audit_id=str(au_subject32_t.auid),
+                    uid=str(au_subject32_t.euid),
+                    gid=str(au_subject32_t.egid),
+                    ruid=str(au_subject32_t.ruid),
+                    rgid=str(au_subject32_t.rgid),
+                    pid=str(au_subject32_t.pid),
+                    sid=str(au_subject32_t.sid),
+                    tid=(au_subject32_t.tid_port, au_subject32_t.tid_addr),
+                )
+                # print_items(au_subject32_t)
                 # dumpstruct(au_subject32_t)
-            case b'\x26':
+            case b"\x26":
                 token_type = "AU_PROC32_T"
                 print("\n[+] Type is %s" % token_type)
                 au_proc32_t = aurecord.au_proc32_t(fh)
                 print_items(au_proc32_t)
                 # dumpstruct(au_proc32_t)
-            case b'\x27':
+            case b"\x27":
                 token_type = "AU_RET32_T"
                 print("\n[+] Type is %s" % token_type)
                 au_ret32_t = aurecord.au_ret32_t(fh)
-                print_items(au_ret32_t)
+
+                ET.SubElement(
+                    record,
+                    "return",
+                    errval=str(au_ret32_t.status),
+                    retval=str(au_ret32_t.ret),
+                )
+                # print_items(au_ret32_t)
                 # dumpstruct(au_ret32)
-            case b'\x28':
+            case b"\x28":
                 token_type = "AU_TEXT_T"
                 print("\n[+] Type is %s" % token_type)
                 au_text_t = aurecord.au_text_t(fh)
-                print_items(au_text_t)
+
+                au_text = ET.SubElement(record, "text")
+                au_text.text = au_text_t.text.decode("utf-8")
+                # print_items(au_text_t)
                 # dumpstruct(au_text_t)
-            case b'\x29':
+            case b"\x29":
                 token_type = "AU_OPAQUE_T"
                 print("\n[+] Type is %s" % token_type)
                 au_opaque_t = aurecord.au_opaque_t(fh)
                 print_items(au_opaque_t)
                 # dumpstruct(au_opaque_t)
-            case b'\x2a':
+            case b"\x2a":
                 token_type = "AUINADDR_T"
                 print("\n[+] Type is %s" % token_type)
                 auinaddr_t = aurecord.auinaddr_t(fh)
                 print_items(auinaddr_t)
                 # dumpstruct(auinaddr_t)
-            case b'\x2b':
+            case b"\x2b":
                 token_type = "AUIP_T"
                 print("\n[+] Type is %s" % token_type)
                 auip_t = aurecord.auip_t(fh)
                 print_items(auip_t)
                 # dumpstruct(auip_t)
-            case b'\x2c':
+            case b"\x2c":
                 token_type = "AUIPORT_T"
                 print("\n[+] Type is %s" % token_type)
                 auiport_t = aurecord.auiport_t(fh)
                 print_items(auiport_t)
                 # dumpstruct(auiport_t)
-            case b'\x2d':
+            case b"\x2d":
                 token_type = "AU_ARG32_T"
                 print("\n[+] Type is %s" % token_type)
                 au_arg32_t = aurecord.au_arg32_t(fh)
-                print_items(au_arg32_t)
+                # print_items(au_arg32_t)
+
+                ET.SubElement(
+                    record,
+                    "argument",
+                    arg_num=str(au_arg32_t.no),
+                    value=str(au_arg32_t.val),
+                    desc=str(au_arg32_t.text.decode("utf-8")),
+                )
+                # au_arg32 = ET.SubElement(record,"argument")
+                # au_arg32.text = au_arg32_t.text.decode("utf-8")
                 # dumpstruct(au_arg32_t)
-            case b'\x2e':
+            case b"\x2e":
                 token_type = "AU_SOCKET_T"
                 print("\n[+] Type is %s" % token_type)
                 au_socket_t = aurecord.au_socket_t(fh)
                 print_items(au_socket_t)
                 # dumpstruct(au_socket_t)
-            case b'\x2f':
+            case b"\x2f":
                 token_type = "AU_SEQ_T"
                 print("\n[+] Type is %s" % token_type)
                 au_seq_t = aurecord.au_seq_t(fh)
                 print_items(au_seq_t)
                 # dumpstruct(au_seq_t)
-            case b'\x31':
-                token_type = "AU_ATTR_T"
+            case b"\x31":
+                token_type = "AU_ATTR32_T"
                 print("\n[+] Type is %s" % token_type)
-                au_attr_t = aurecord.au_attr_t(fh)
-                print_items(au_attr_t)
-                # dumpstruct(au_attr_t)
-            case b'\x32':
+                au_attr32_t = aurecord.au_attr32_t(fh)
+                print_items(au_attr32_t)
+
+                ET.SubElement(
+                    record,
+                    "attribute",
+                    mode=str(au_attr32_t.mode),
+                    uid=str(au_attr32_t.uid),
+                    gid=str(au_attr32_t.gid),
+                    fsid=str(au_attr32_t.fsid),
+                    nodeid=str(au_attr32_t.nid),
+                    device=str(au_attr32_t.dev),
+                )
+                print("[!] Should've added an XML element to the doc at this point")
+                # dumpstruct(au_attr32_t)
+            case b"\x32":
                 token_type = "AUIPCPERM_T"
                 print("\n[+] Type is %s")
                 auipcperm_t = aurecord.auipcperm_t(fh)
                 print_items(auipcperm_t)
                 # dumpstruct(auipcperm_t)
-            case b'\x34':
+            case b"\x34":
                 token_type = "AU_PRIV_T"
                 print("\n[+] Type is %s" % token_type)
                 au_groups_t = aurecord.au_groups_t(fh)
                 print_items(au_groups_t)
                 # dumpstruct(au_groups_t)
-            case b'\x38':
+            case b"\x38":
                 token_type = "AU_PRIV_T"
                 print("\n[+] Type is: %s")
                 au_priv_t = aurecord.au_priv_t(fh)
                 print_items(au_priv_t)
                 # dumpstruct(au_priv_t)
-            case b'\x3c':
+            case b"\x3c":
                 token_type = "AU_EXECARG_T"
                 print("\n[+] Type is: %s", token_type)
                 au_execarg_t = aurecord.au_execarg_t(fh)
                 print_items(au_execarg_t)
                 # dumpstruct(au_execarg_t)
-            case b'\x3d':
+            case b"\x3d":
                 token_type = "AU_EXECENV_T"
                 print("\n[+] Type is %s" % token_type)
                 au_execenv_t = aurecord.au_execenv_t(fh)
                 print_items(au_execenv_t)
                 # dumpstruct(au_execenv_t)
-            case b'\x3e':
+            case b"\x3e":
                 token_type = "AU_ATTR32_t"
                 print("\n[+] Type is %s" % token_type)
                 au_attr32_t = aurecord.au_attr32_t(fh)
                 print_items(au_attr32_t)
                 # dumpstruct(au_attr32_t)
-            case b'\x52':
+            case b"\x52":
                 token_type = "AU_EXIT_T"
                 print("\n[+] Type is %s" % token_type)
                 au_exit_t = aurecord.au_exit_t(fh)
                 print_items(au_exit_t)
                 # dumpstruct(au_exit_t)
-            case b'\x60':
+            case b"\x60":
                 token_type = "AU_ZONENAME_T"
                 print("\n[+] Type is %s" % token_type)
                 au_zonename_t = aurecord.au_zonename_t(fh)
                 print_items(au_zonename_t)
-                # dumpstruct(au_zonename_t)       
-            case b'\x71':
+                # dumpstruct(au_zonename_t)
+            case b"\x71":
                 token_type = "AU_ARG64_T"
                 print("\n[+] Type is %s" % token_type)
                 au_arg64_t = aurecord.au_arg64_t(fh)
                 print_items(au_arg64_t)
                 # dumpstruct(au_arg64_t)
-            case b'\x72':
+            case b"\x72":
                 token_type = "AU_RET64_T"
                 print("\n[+] Type is %s" % token_type)
                 au_ret64_t = aurecord.au_ret64_t(fh)
                 print_items(au_ret64_t)
                 # dumpstruct(au_ret64_t)
-            case b'\x73':
+            case b"\x73":
                 token_type = "AU_ATTR64_T"
                 print("\n[+] Type is %s" % token_type)
                 au_attr64_t = aurecord.au_attr64_t(fh)
                 print_items(au_attr64_t)
                 # dumpstruct(au_attr64_t)
-            case b'\x74':
+            case b"\x74":
                 token_type = "AU_HEADER64_t"
                 print("\n[+] Type is %s" % token_type)
                 au_header64_t = aurecord.au_header64_t(fh)
                 print_items(au_header64_t)
                 # dumpstruct(au_header64_t)
-            case b'\x75':
+            case b"\x75":
                 token_type = "AU_SUBJECT64_T"
                 print("\n[+] Type is %s" % token_type)
                 au_subject64_t = aurecord.au_subject64_t(fh)
                 print_items(au_subject64_t)
                 # dumpstruct(au_subject64_t)
-            case b'\x77':
+            case b"\x77":
                 token_type = "AU_PROCESS64_T"
                 print("\n[+] Type is %s" % token_type)
                 au_proc64_t = aurecord.au_proc64_t(fh)
                 print_items(au_proc64_t)
                 # dumpstruct(au_proc64_t)
-            case b'\x79':
+            case b"\x79":
                 token_type = "AU_HEADER64_EX_T"
                 print("\n[+] Type is %s" % token_type)
                 au_header64_ex_t = aurecord.au_header64_ex_t(fh)
                 print_items(au_header64_ex_t)
                 # dumpstruct(au_header64_ex_t)
-            case b'\x7a':
+            case b"\x7a":
                 token_type = "AU_SUBJECT32EX_T"
                 print("\n[+] Type is %s" % token_type)
                 au_subject32ex_t = aurecord.au_subject32ex_t(fh)
                 print_items(au_subject32ex_t)
                 # dumpstruct(au_subject32ex_t)
-            case b'\x7b':
+            case b"\x7b":
                 token_type = "AU_PROC32EXT_T"
                 print("\n[+] Type is %s" % token_type)
                 au_proc32ex_t = aurecord.au_proc32ex_t(fh)
                 print_items(au_proc32ex_t)
                 # dumpstruct(au_proc32ex_t)
-            case b'\x7c':
+            case b"\x7c":
                 token_type = "AU_SUBJECT64EX_T"
                 print("\n[+] Type is %s" % token_type)
                 au_subject64ex_t = aurecord.au_subject64ex_t(fh)
                 print_items(au_subject64ex_t)
                 # dumpstruct(au_subject64ex_t)
-            case b'\x7d':
+            case b"\x7d":
                 token_type = "AU_PROC64EX_T"
                 print("\n[+] Type is %s" % token_type)
                 au_proc64ex_t = aurecord.au_proc64ex_t(fh)
                 print_items(au_proc64ex_t)
                 # dumpstruct(au_proc64ex_t)
-            case b'\x7e':
+            case b"\x7e":
                 token_type = "AUINADDR_EX_T"
                 print("\n[+] Type is %s" % token_type)
                 auinaddr_ex_t = aurecord.auinaddr_ex_t(fh)
                 print_items(auinaddr_ex_t)
                 # dumpstruct(auinaddr_ex_t)
-            case b'':
-                print("\nEnd of File reached!\nExiting...")
+            case b"":
+                print("\nEnd of File reached!")
                 not_empty = False
             case _:
-                print("\n!invalid record type! %s" % header_type)
+                print("\n[!!!] invalid record type! %s" % header_type)
                 not_empty = False
+    # tree = ET.ElementTree(trail)
+    print("===========================XML START===========================")
+    with open("xml-dump.xml", "w+") as f:
+        f.write("<?xml version='1.0'?>")
+        f.write(ET.tostring(audit, method="xml").decode("utf-8"))
+    print("[+] Wrote XML to disk!")
+    print("[+] Exiting...")
+    # print(ET.tostring(audit, method="xml").decode("utf-8"))
+    print("===========================XML END=============================")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
