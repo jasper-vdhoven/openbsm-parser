@@ -1,7 +1,8 @@
 .venv310
 .venv311
 .vscode
-*.xml
 output_log
 example-logs
 new-example-logs/
+xml-dump.xml
+audit-xml-structure-template.xml
