@@ -695,7 +695,7 @@ def main():
                     event=str(au_header32_t.e_type),
                     modifier=str(au_header32_t.e_mod),
                     time=str(au_header32_t.s),
-                    msec=str(au_header32_t.ms),
+                    msec=f" + {str(au_header32_t.ms)} msec",
                 )
                 # print_items(au_header32_t)
                 # dumpstruct(au_header32_t)
