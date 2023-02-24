@@ -646,6 +646,7 @@ typedef struct {
 } au_unixsock_t_special;
 """
 
+# TODO: run a macOS / Solaris audit trail through the current parser and see how it holds up
 
 def print_items(parsed_record):
     # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
@@ -705,7 +706,7 @@ def main():
                     msec=f" + {str(au_header32_t.ms)} msec",
                 )
                 # print_items(au_header32_t)
-                # dumpstruct(au_header32_t)
+                dumpstruct(au_header32_t)
             case b"\x15":
                 token_type = "AU_HEADER32_EX_T"
                 print("\+] Type is %s" % token_type)
@@ -813,7 +814,7 @@ def main():
                 )
                 # au_arg32 = ET.SubElement(record,"argument")
                 # au_arg32.text = au_arg32_t.text.decode("utf-8")
-                # dumpstruct(au_arg32_t)
+                dumpstruct(au_arg32_t)
             case b"\x2e":
                 token_type = "AU_SOCKET_T"
                 print("[+] Type is %s" % token_type)
