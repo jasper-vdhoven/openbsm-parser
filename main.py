@@ -637,6 +637,13 @@ typedef struct {
 	uint16_t	magic;
 	uint32_t	count;
 } au_trailer_t;
+
+// special struct that is used to parse local Unix sockets
+// struct matches AUT_SOCKET // 0x82
+typedef struct {
+    ushort      family;
+    char        addr[];
+} au_unixsock_t_special;
 """
 
 
@@ -735,7 +742,7 @@ def main():
                     rgid=str(au_subject32_t.rgid),
                     pid=str(au_subject32_t.pid),
                     sid=str(au_subject32_t.sid),
-                    tid=(au_subject32_t.tid_port, au_subject32_t.tid_addr),
+                    tid=str(au_subject32_t.tid_port, au_subject32_t.tid_addr),
                 )
                 # print_items(au_subject32_t)
                 # dumpstruct(au_subject32_t)
@@ -970,6 +977,21 @@ def main():
                 auinaddr_ex_t = aurecord.auinaddr_ex_t(fh)
                 print_items(auinaddr_ex_t)
                 # dumpstruct(auinaddr_ex_t)
+
+            case b"\x82":
+                token_type = "AUT_SOCKET - UNIX 0x82"
+                print("[+] Type is %s" % token_type)
+                au_unixsocket_t_special = aurecord.au_unixsock_t_special(fh)
+
+                ET.SubElement(
+                    record,
+                    "socket-unix",
+                    type=str(au_unixsocket_t_special.family),
+                    port="",
+                    addr=str(au_unixsocket_t_special.addr.decode("utf-8")),
+                )
+
+                dumpstruct(au_unixsocket_t_special)
             case b"":
                 print("\nEnd of File reached!")
                 not_empty = False
