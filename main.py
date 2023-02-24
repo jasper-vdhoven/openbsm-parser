@@ -609,7 +609,7 @@ typedef struct {
  */
 typedef struct {
 	uint16_t	 len;
-	// changed type char *zonename to play nice witd Dissect parsing
+	// changed type char *zonename to play nice with Dissect parsing
     char         zonename[len-1];
     char         nbt;
 } au_zonename_t;
@@ -975,7 +975,7 @@ def main():
                 not_empty = False
             case _:
                 print("\n[E] invalid record type! %s" % header_type)
-                print("[!] Writing parsed records to disk and then quiting\n")
+                print("[!] Writing parsed records to disk and then quitting\n")
                 not_empty = False
     # tree = ET.ElementTree(trail)
     print("===========================XML START===========================")
