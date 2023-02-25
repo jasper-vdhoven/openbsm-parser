@@ -1,8 +1,16 @@
 #!/usr/bin/env python
 from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
-
+import logging
 import xml.etree.cElementTree as ET
+
+# Set logging info
+logging.basicConfig(level=logging.INFO)
+logging.basicConfig(format='[D] - %(asctime)s - %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='[I] - %(asctime)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='[E] - %(asctime)s - %(message)s', level=logging.WARN)
+logging.basicConfig(format='[E] - %(asctime)s - %(message)s', level=logging.CRITICAL)
+
 
 cdef = """
 /*
@@ -666,36 +674,47 @@ def main():
         exit("usage: main.py <audit_trail>")
 
     try:
+        logging.info(f'Attempting to open file: {argv[1]}')
         fh = open(argv[1], "rb")
     except FileNotFoundError:
-        raise
+        logging.warning(f"Could not open file: {argv[1]}")
+        raise FileNotFoundError
 
     not_empty = True
+    clean = True
 
-    while not_empty:
+    while not_empty and clean:
         # Check the first byte for record type
+        logging.info("Reading one byte to determine record type")
         header_type = fh.read(1)
+        logging.debug(f"Byte read is: {header_type}")
 
         match header_type:
             case b"\x00":
                 token_type = "AUINVALID_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auinvalid_t = aurecord.auinvalid_t(fh)
-                print_items(auinvalid_t)
-                # dumpstruct(auinvalid_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auinvalid_t))
             case b"\x13":
                 token_type = "AU_TRAILER_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_trailer_t = aurecord.au_trailer_t(fh)
-                # print_items(au_trailer_t)
-                # dumpstruct(au_trailer_t)
-                print("=" * 21 + "END AUDIT RECORD" + "=" * 21)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_trailer_t))
+                logging.info(f"Record end reached; returning for next record")
             case b"\x14":
                 token_type = "AU_HEADER32_T"
-                print("=" * 20 + "START AUDIT RECORD" + "=" * 20)
-                print("[+] Type is %s" % token_type)
+                logging.info("Record start; parsing record contents")
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_header32_t = aurecord.au_header32_t(fh)
 
+                logging.debug(f"Adding parsed record to XML object")
                 record = ET.SubElement(
                     audit,
                     "record",
@@ -705,34 +724,42 @@ def main():
                     time=str(au_header32_t.s),
                     msec=f" + {str(au_header32_t.ms)} msec",
                 )
-                # print_items(au_header32_t)
-                dumpstruct(au_header32_t)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_header32_t))
             case b"\x15":
                 token_type = "AU_HEADER32_EX_T"
-                print("\+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_header32_ex_t = aurecord.au_header32_ex_t(fh)
-                # print_items(au_header32_ex_t)
-                # dumpstruct(au_header32_ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_header32_ex_t))
             case b"\x22":
                 token_type = "AUIPC_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auipc_t = aurecord.auipc_t(fh)
-                print_items(auipc_t)
-                # dumpstruct(auipc_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auipc_t))
             case b"\x23":
                 token_type = "AU_PATH_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_path_t = aurecord.au_path_t(fh)
-                # print_items(au_path_t)
-
+                logging.debug(f"Adding parsed record to XML object")
                 au_path = ET.SubElement(record, "path")
                 au_path.text = au_path_t.path.decode("utf-8")
-                # dumpstruct(au_path_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_path_t))
             case b"\x24":
                 token_type = "AU_SUBJECT32_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_subject32_t = aurecord.au_subject32_t(fh)
 
+                logging.debug(f"Adding parsed record to XML object")
                 ET.SubElement(
                     record,
                     "subject",
@@ -743,68 +770,84 @@ def main():
                     rgid=str(au_subject32_t.rgid),
                     pid=str(au_subject32_t.pid),
                     sid=str(au_subject32_t.sid),
-                    tid=str(au_subject32_t.tid_port, au_subject32_t.tid_addr),
+                    tid=(au_subject32_t.tid_port, au_subject32_t.tid_addr),
                 )
-                # print_items(au_subject32_t)
-                # dumpstruct(au_subject32_t)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_subject32_t))
             case b"\x26":
                 token_type = "AU_PROC32_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_proc32_t = aurecord.au_proc32_t(fh)
-                print_items(au_proc32_t)
-                # dumpstruct(au_proc32_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_proc32_t))
             case b"\x27":
                 token_type = "AU_RET32_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_ret32_t = aurecord.au_ret32_t(fh)
 
+                logging.debug(f"Adding parsed record to XML object")
                 ET.SubElement(
                     record,
                     "return",
                     errval=str(au_ret32_t.status),
                     retval=str(au_ret32_t.ret),
                 )
-                # print_items(au_ret32_t)
-                # dumpstruct(au_ret32)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_ret32_t))
             case b"\x28":
                 token_type = "AU_TEXT_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_text_t = aurecord.au_text_t(fh)
 
                 au_text = ET.SubElement(record, "text")
                 au_text.text = au_text_t.text.decode("utf-8")
-                # print_items(au_text_t)
-                # dumpstruct(au_text_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_text_t))
             case b"\x29":
                 token_type = "AU_OPAQUE_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_opaque_t = aurecord.au_opaque_t(fh)
-                print_items(au_opaque_t)
-                # dumpstruct(au_opaque_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_opaque_t))
             case b"\x2a":
                 token_type = "AUINADDR_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auinaddr_t = aurecord.auinaddr_t(fh)
-                print_items(auinaddr_t)
-                # dumpstruct(auinaddr_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auinaddr_t))
             case b"\x2b":
                 token_type = "AUIP_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auip_t = aurecord.auip_t(fh)
-                print_items(auip_t)
-                # dumpstruct(auip_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auip_t))
             case b"\x2c":
                 token_type = "AUIPORT_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auiport_t = aurecord.auiport_t(fh)
-                print_items(auiport_t)
-                # dumpstruct(auiport_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auiport_t))
             case b"\x2d":
                 token_type = "AU_ARG32_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_arg32_t = aurecord.au_arg32_t(fh)
-                # print_items(au_arg32_t)
 
+                logging.debug(f"Adding parsed record to XML object")
                 ET.SubElement(
                     record,
                     "argument",
@@ -812,76 +855,90 @@ def main():
                     value=str(au_arg32_t.val),
                     desc=str(au_arg32_t.text.decode("utf-8")),
                 )
-                # au_arg32 = ET.SubElement(record,"argument")
-                # au_arg32.text = au_arg32_t.text.decode("utf-8")
-                dumpstruct(au_arg32_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_arg32_t))
             case b"\x2e":
                 token_type = "AU_SOCKET_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_socket_t = aurecord.au_socket_t(fh)
-                print_items(au_socket_t)
-                # dumpstruct(au_socket_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_socket_t))
             case b"\x2f":
                 token_type = "AU_SEQ_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_seq_t = aurecord.au_seq_t(fh)
-                print_items(au_seq_t)
-                # dumpstruct(au_seq_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_seq_t))
             case b"\x31":
                 token_type = "AU_ATTR_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_attr_t = aurecord.au_attr_t(fh)
-                print_items(au_attr_t)
 
-                # dumpstruct(au_attr32_t)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_attr_t))
             case b"\x32":
                 token_type = "AUIPCPERM_T"
-                print("[+] Type is %s")
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auipcperm_t = aurecord.auipcperm_t(fh)
-                print_items(auipcperm_t)
-                # dumpstruct(auipcperm_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(auipcperm_t))
             case b"\x34":
                 token_type = "AU_PRIV_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_groups_t = aurecord.au_groups_t(fh)
-                print_items(au_groups_t)
-                # dumpstruct(au_groups_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_groups_t))
             case b"\x38":
                 token_type = "AU_PRIV_T"
-                print("[+] Type is: %s")
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_priv_t = aurecord.au_priv_t(fh)
-                print_items(au_priv_t)
-                # dumpstruct(au_priv_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_priv_t))
             case b"\x3c":
                 token_type = "AU_EXECARG_T"
-                print("[+] Type is: %s", token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_execarg_t = aurecord.au_execarg_t(fh)
-                # print_items(au_execarg_t)
 
                 au_execarg = ET.SubElement(record, "exec_args")
                 for items in au_execarg_t.text:
                     arg = ET.SubElement(au_execarg, "arg")
                     arg.text = items.decode("utf-8")
-                # dumpstruct(au_execarg_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_execarg_t))
             case b"\x3d":
                 token_type = "AU_EXECENV_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_execenv_t = aurecord.au_execenv_t(fh)
-                # print_items(au_execenv_t)
 
                 au_execenv = ET.SubElement(record, "exec_env")
                 for items in au_execenv_t.text:
                     arg = ET.SubElement(au_execenv, "env")
                     arg.text = items.decode("utf-8")
 
-                # print(ET.tostring(audit, method="xml").decode("utf-8"))
-                # dumpstruct(au_execenv_t)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_execenv_t))
             case b"\x3e":
                 token_type = "AU_ATTR32_t"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_attr32_t = aurecord.au_attr32_t(fh)
-                # print_items(au_attr32_t)
 
+                logging.debug(f"Adding parsed record to XML object")
                 ET.SubElement(
                     record,
                     "attribute",
@@ -893,97 +950,128 @@ def main():
                     device=str(au_attr32_t.dev),
                 )
 
-                # dumpstruct(au_attr32_t)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_attr32_t))
             case b"\x52":
                 token_type = "AU_EXIT_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_exit_t = aurecord.au_exit_t(fh)
-                print_items(au_exit_t)
-                # dumpstruct(au_exit_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_exit_t))
             case b"\x60":
                 token_type = "AU_ZONENAME_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_zonename_t = aurecord.au_zonename_t(fh)
-                print_items(au_zonename_t)
-                # dumpstruct(au_zonename_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_zonename_t))
             case b"\x71":
                 token_type = "AU_ARG64_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_arg64_t = aurecord.au_arg64_t(fh)
-                print_items(au_arg64_t)
-                # dumpstruct(au_arg64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_arg64_t))
             case b"\x72":
                 token_type = "AU_RET64_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_ret64_t = aurecord.au_ret64_t(fh)
-                print_items(au_ret64_t)
-                # dumpstruct(au_ret64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_ret64_t))
             case b"\x73":
                 token_type = "AU_ATTR64_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_attr64_t = aurecord.au_attr64_t(fh)
-                print_items(au_attr64_t)
-                # dumpstruct(au_attr64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_attr64_t))
             case b"\x74":
                 token_type = "AU_HEADER64_t"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_header64_t = aurecord.au_header64_t(fh)
-                print_items(au_header64_t)
-                # dumpstruct(au_header64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_header64_t))
             case b"\x75":
                 token_type = "AU_SUBJECT64_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_subject64_t = aurecord.au_subject64_t(fh)
-                print_items(au_subject64_t)
-                # dumpstruct(au_subject64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_subject64_t))
             case b"\x77":
                 token_type = "AU_PROCESS64_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_proc64_t = aurecord.au_proc64_t(fh)
-                print_items(au_proc64_t)
-                # dumpstruct(au_proc64_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_proc64_t))
             case b"\x79":
                 token_type = "AU_HEADER64_EX_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_header64_ex_t = aurecord.au_header64_ex_t(fh)
-                print_items(au_header64_ex_t)
-                # dumpstruct(au_header64_ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_header64_ex_t))
             case b"\x7a":
                 token_type = "AU_SUBJECT32EX_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_subject32ex_t = aurecord.au_subject32ex_t(fh)
-                print_items(au_subject32ex_t)
-                # dumpstruct(au_subject32ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_subject32ex_t))
             case b"\x7b":
                 token_type = "AU_PROC32EXT_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_proc32ex_t = aurecord.au_proc32ex_t(fh)
-                print_items(au_proc32ex_t)
-                # dumpstruct(au_proc32ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_proc32ex_t))
             case b"\x7c":
                 token_type = "AU_SUBJECT64EX_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_subject64ex_t = aurecord.au_subject64ex_t(fh)
-                print_items(au_subject64ex_t)
-                # dumpstruct(au_subject64ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_subject64ex_t))
             case b"\x7d":
                 token_type = "AU_PROC64EX_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_proc64ex_t = aurecord.au_proc64ex_t(fh)
-                print_items(au_proc64ex_t)
-                # dumpstruct(au_proc64ex_t)
+
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(print_items(au_proc64ex_t))
             case b"\x7e":
                 token_type = "AUINADDR_EX_T"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 auinaddr_ex_t = aurecord.auinaddr_ex_t(fh)
-                print_items(auinaddr_ex_t)
-                # dumpstruct(auinaddr_ex_t)
+                logging.info(print_items(auinaddr_ex_t))
 
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(dumpstruct(auinaddr_ex_t))
             case b"\x82":
                 token_type = "AUT_SOCKET - UNIX 0x82"
-                print("[+] Type is %s" % token_type)
+                logging.debug(f"Type is: {header_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
                 au_unixsocket_t_special = aurecord.au_unixsock_t_special(fh)
 
+                logging.debug(f"Adding parsed record to XML object")
                 ET.SubElement(
                     record,
                     "socket-unix",
@@ -991,24 +1079,29 @@ def main():
                     port="",
                     addr=str(au_unixsocket_t_special.addr.decode("utf-8")),
                 )
-
-                dumpstruct(au_unixsocket_t_special)
+                logging.debug(f"Dumping struct: {token_type}")
+                logging.debug(dumpstruct(au_unixsocket_t_special))
             case b"":
-                print("\nEnd of File reached!")
+                logging.info("End of file reached; no errors occurred getting here")
+                logging.info("Exiting loop on clean state & writing collected XML to disk")
                 not_empty = False
             case _:
-                print("\n[E] invalid record type! %s" % header_type)
-                print("[!] Writing parsed records to disk and then quitting\n")
-                not_empty = False
-    # tree = ET.ElementTree(trail)
-    print("===========================XML START===========================")
+                logging.error(f"Encountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
+                logging.error(f"Writing collected XML to disk; then exiting on non-zero exit code")
+                clean = False
+
+    logging.debug("Attempting to open XML output file: xml-dump.xml")
     with open("xml-dump.xml", "w+") as f:
+        logging.debug("Writing XML version information to disk")
         f.write("<?xml version='1.0'?>")
+        logging.info("Writing collected XML to disk")
         f.write(ET.tostring(audit, method="xml").decode("utf-8"))
-        print("[+] Wrote XML to disk!")
-    print("[+] Exiting...")
-    # print(ET.tostring(audit, method="xml").decode("utf-8"))
-    print("===========================XML END=============================")
+        logging.info("Wrote collected XML to disk")
+        if not clean:
+            logging.critical("XMl is not completed due to prior error!")
+            logging.critical("Check logs and output for possible reasons for premature exit")
+            exit -1
+    logging.info("Exiting on exit code 0; all good to go!")
 
 
 if __name__ == "__main__":
