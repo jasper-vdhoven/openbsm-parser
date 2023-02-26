@@ -465,10 +465,9 @@ typedef struct {
 	uint16_t	type;
 	uint16_t	atype;
 	uint16_t	l_port;
-    // dynamically calculate the space required; thx Yoran for the Wolfram magic
-	uint8_t	    l_addr[(6 * atype) - 20];
+	uint8_t	    l_addr[atype];
 	uint16_t	r_port;
-	uint8_t	    r_addr[(6 * atype) - 20];
+	uint8_t	    r_addr[atype];
 } au_socket_ex32_t;
 
 /*
