@@ -654,6 +654,60 @@ typedef struct {
     ushort      family;
     char        addr[];
 } au_unixsock_t_special;
+
+// macOS specific struct pulled from darwin-xnu source code at:
+// https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_private.h#L206
+/*
+ * signer type          4 bytes
+ * signer id length     2 bytes
+ * signer id            n bytes
+ * signer id truncated  1 byte
+ * team id length       2 bytes
+ * team id              n bytes
+ * team id truncated    1 byte
+ * cdhash length        2 bytes
+ * cdhash               n bytes
+ */
+struct au_identity_info {
+	uint32_t        signer_type;
+    short           signer_id_length;
+	char            signing_id[signer_id_length-1];
+    char            nbt;
+	uchar           signing_id_trunc;
+    short           team_id_length;
+	char            team_id[team_id_length-1];
+    char            nbt;
+	uchar           team_id_trunc;
+    short           cdhash_length;
+    char            cdhash[cdhash_length];
+};
+
+// Struct def pulled from: https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_bsm_token.c#L921
+/*
+ * socket family           2 bytes
+ * local port              2 bytes
+ * socket address          16 bytes
+ */
+typedef struct {
+    short           socket_family;
+    ushort           l_port;
+    uint8_t         addr[16];
+} au_socketinet128_t;
+
+// Struct def pulled from: https://github.com/apple/darwin-xnu/blob/8f02f2a044b9bb1ad951987ef5bab20ec9486310/bsd/security/audit/audit_bsm_token.c#L229
+/*
+ * how to print            1 byte
+ * basic unit              1 byte
+ * unit count              1 byte
+ * data items              (depends on basic unit)
+ */
+typedef struct {
+    uint8_t         htprint;
+    uint8_t         butype;
+    uint8_t         unit_count;
+    // thx again Yoran
+    uint8_t         data_items[unit_count * 1 << butype];
+} au_data_t;
 """
 
 # TODO: run a macOS / Solaris audit trail through the current parser and see how it holds up
@@ -725,8 +779,13 @@ def main():
                 logging.info(f"Type is: {header_type} aka {token_type}")
                 logging.debug(f"Parsing memory for type: {token_type}")
                 au_header32_ex_t = aurecord.au_header32_ex_t(fh)
+            case b"\x21":
+                # not actually used for anything?
+                token_type = "AU_DATA_T"
+                logging.info(f"Type is: {header_type} aka {token_type}")
+                logging.debug(f"Parsing memory for type: {token_type}")
 
-                au_data_t = aurecord.au_idkdata_t(fh)
+                au_data_t = aurecord.au_data_t(fh)
                 dumpstruct(au_data_t)
             case b"\x22":
                 token_type = "AUIPC_T"
