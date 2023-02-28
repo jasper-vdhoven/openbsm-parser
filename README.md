@@ -50,8 +50,30 @@ This then looks the following in STDOUT:
 - ms: 419
 ```
 
+## Currently supported
+
+- [x] OpenBSM audit trail types
+- [X] macOS audit trail types
+- [x] Simple XML output conform to `praudit` XML flag
+- [x] Writing output to `.xml` file
+- [x] Log of actions and types parsed (even those without XML implementations)
+
 ## Future update plans
 
-At the time of writing, this parser should be able to parse ~~all~~ records that OpenBSM contains among those that I was able to easily get testing data for. The goal is to have the parser output its results as XML so that they can then be easily ingested into Splunk, Elastic, et al and be used in digital forensic investigations.
+- Native Unix epoch -> UTC time conversions for the `time` field in headers
+	- Flag to make this optional
+- Native UID/GID -> Username / Group name conversions using the source `/etc/passwd` and `/etc/groups` files
+	- Flag to make this optional
+- Better handling of ERR return vals so they match that of `praudit` instead of `4294967295`.
+- Support for Solaris audit trails
+- Optional XML / JSON output formatting
 
-If you spot a bug, typo or want to contribute feel free to shoot in a pull request or issue :)
+# Contribute
+
+If you spot a bug, typo or want to contribute feel; free to shoot in a pull request or issue :)
+
+# Credits
+
+This project would not be have possible without the help of the following individual(s):
+
+- [MrYoranimo](https://github.com/MrYoranimo)
