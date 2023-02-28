@@ -52,7 +52,7 @@ This then looks the following in STDOUT:
 
 ## Currently supported
 
-- [x] OpenBSM audit trail types
+- [x] FreeBSD audit trail types
 - [X] macOS audit trail types
 - [x] Simple XML output conform to `praudit` XML flag
 - [x] Writing output to `.xml` file
