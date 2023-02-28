@@ -256,16 +256,16 @@ typedef struct {
  */
 typedef struct {
 	uint32_t	addr;
-} auinaddr_t;
+} au_inaddr_t;
 
 /*
- * type                 4 bytes
- * internet address     16 bytes
+ * type                    4 bytes
+ * internet address        16 bytes
  */
 typedef struct {
 	uint32_t	type;
 	uint32_t	addr[4];
-} auinaddr_ex_t;
+} au_inaddr_ex_t;
 
 /*
  * version and ihl         1 byte
@@ -733,7 +733,7 @@ typedef struct {
 } au_data_t;
 """
 
-# TODO: run a macOS / Solaris audit trail through the current parser and see how it holds up
+# TODO: add Solaris parsing support
 
 def print_items(parsed_record):
     # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
