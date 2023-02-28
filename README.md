@@ -70,7 +70,7 @@ This then looks the following in STDOUT:
 
 # Contribute
 
-If you spot a bug, typo or want to contribute feel; free to shoot in a pull request or issue :)
+If you spot a bug, typo or want to contribute feel free to shoot in a pull request or issue :)
 
 # Credits
 
