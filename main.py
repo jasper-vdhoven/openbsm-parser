@@ -3,6 +3,8 @@ from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
 import logging
 import xml.etree.cElementTree as ET
+from datetime import datetime as DT
+from time import time as TT
 
 # Set logging info
 ## Log level formatting
@@ -19,11 +21,11 @@ for level, format_str in custom_level_formats.items():
 
 ## Create Logger
 logger = logging.getLogger('OpenBSM-Parser')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 
 ## Create console handler
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.ERROR)
 
 ## Set format of log messages
 logging_format = logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
@@ -754,6 +756,7 @@ def main():
 
     try:
         logger.info(f'Attempting to open file: {argv[1]}')
+        print("[-] Valid file path given; starting parser")
         fh = open(argv[1], "rb")
     except FileNotFoundError:
         logging.error(f"Could not open file: {argv[1]}")
@@ -762,11 +765,18 @@ def main():
     not_empty = True
     clean = True
 
+    record_count = 0
+
+    # start perf timer HERE
+    start_time = TT()
+
     while not_empty and clean:
+        print(f"    - Record count is {record_count}", end="\r")
         # Check the first byte for record type
         logger.info("Reading one byte to determine record type")
         header_type = fh.read(1)
 
+        # TODO: make this *a lot* faster; parsing files in the MegaBytes takes forever to do
         match header_type:
             case b"\x00":
                 token_type = "AUINVALID_T"
@@ -780,6 +790,7 @@ def main():
                 au_trailer_t = aurecord.au_trailer_t(fh)
                 logger.info(f"Record end reached; returning for next record")
                 logger.debug(f"No XML entry is required for this type!")
+                record_count += 1
             case b"\x14":
                 token_type = "AU_HEADER32_T"
                 logger.info("Record start; parsing record contents")
@@ -795,7 +806,7 @@ def main():
                     version=str(au_header32_t.version),
                     event=str(au_header32_t.e_type),
                     modifier=str(au_header32_t.e_mod),
-                    time=str(au_header32_t.s),
+                    time=str(DT.fromtimestamp(au_header32_t.s).strftime('%c')),
                     msec=f" + {str(au_header32_t.ms)} msec",
                 )
             case b"\x15":
@@ -1152,6 +1163,10 @@ def main():
                 logger.info("End of file reached; no errors occurred getting here")
                 logger.info("Exiting loop on clean state & writing collected XML to disk")
                 ET.indent(audit, space="\t", level=0)
+                end_time = TT()
+                # Calculate and display running time:
+                run_time = end_time - start_time
+                print(f"[-] Time spent crunching records: {run_time:.2f} seconds")
                 not_empty = False
             case _:
                 logger.error(f"Encountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
@@ -1159,7 +1174,9 @@ def main():
                 clean = False
 
     logger.debug("Attempting to open XML output file: xml-dump.xml")
+
     with open("xml-dump.xml", "w+") as f:
+        print(f"[-] Final record count is: {record_count}")
         logger.debug("Writing XML version information to disk")
         f.write("<?xml version='1.0'?>\n")
         logger.info("Writing collected XML to disk")
