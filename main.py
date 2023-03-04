@@ -2,12 +2,13 @@
 from sys import argv, exit
 from dissect.cstruct import cstruct, dumpstruct
 import logging
-import xml.etree.cElementTree as ET
 from datetime import datetime as DT
 from time import time as TT
+from progress.bar import Bar
+import os.path
 
 # Set logging info
-## Log level formatting
+# Log level formatting
 custom_level_formats = {
     logging.DEBUG:      "[+] DEBUG",
     logging.INFO:       "[i] INFO ",
@@ -19,22 +20,23 @@ custom_level_formats = {
 for level, format_str in custom_level_formats.items():
     logging.addLevelName(level, format_str)
 
-## Create Logger
+# Create Logger
 logger = logging.getLogger('OpenBSM-Parser')
 logger.setLevel(logging.ERROR)
 
-## Create console handler
+# Create console handler
 ch = logging.StreamHandler()
 ch.setLevel(logging.ERROR)
 
-## Set format of log messages
-logging_format = logging.Formatter("%(levelname)s - %(asctime)s - %(name)s - %(message)s")
+# Set format of log messages
+logging_format = logging.Formatter(
+    "%(levelname)s - %(asctime)s - %(name)s - %(message)s")
 logging.basicConfig(filename="parser_log.log", encoding="utf-8")
 
-## Add formatter to ch
+# Add formatter to ch
 ch.setFormatter(logging_format)
 
-## Add ch to logger
+# Add ch to logger
 logger.addHandler(ch)
 
 cdef = """
@@ -737,6 +739,13 @@ typedef struct {
 
 # TODO: add Solaris parsing support
 
+
+class Bar(Bar):
+    message = "Bytes read"
+    fill = "*"
+    suffix = '%(remaining)d Bytes - %(elapsed)d Seconds'
+
+
 def print_items(parsed_record):
     # Get the individual items inside each audit token, similar to how dissect's dumpstruct does
     for item in parsed_record._type.fields:
@@ -748,444 +757,381 @@ def main():
     aurecord = cstruct(endian=">")
     aurecord.load(cdef, compiled=True)
 
-    # XML doc definitions
-    audit = ET.Element("audit")
+    # Define output file name
+    # TODO: allow users to pass their desired file names
+    output_file = f"{str(argv[1]).split('/')[-1]}-XML-dump.xml"
+    print(output_file)
+
+    # Progress bar creation
+    bar = Bar('Bytes read', max=int(os.path.getsize(argv[1])))
 
     if len(argv) != 2:
         exit("usage: main.py <audit_trail>")
 
     try:
         logger.info(f'Attempting to open file: {argv[1]}')
-        print("[-] Valid file path given; starting parser")
         fh = open(argv[1], "rb")
     except FileNotFoundError:
         logging.error(f"Could not open file: {argv[1]}")
         raise FileNotFoundError
 
+    print("[-] Valid file path given; starting parser")
     not_empty = True
     clean = True
 
     record_count = 0
+    with open(f"{output_file}", "w+") as f:
+        f.write("<?xml version='1.0'?>\n<audit>\n")
 
     # start perf timer HERE
     start_time = TT()
-
     while not_empty and clean:
-        print(f"    - Record count is {record_count}", end="\r")
         # Check the first byte for record type
         logger.info("Reading one byte to determine record type")
         header_type = fh.read(1)
+        bar.goto(fh.tell())
 
         # TODO: make this *a lot* faster; parsing files in the MegaBytes takes forever to do
         match header_type:
             case b"\x00":
                 token_type = "AUINVALID_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 auinvalid_t = aurecord.auinvalid_t(fh)
             case b"\x13":
                 token_type = "AU_TRAILER_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_trailer_t = aurecord.au_trailer_t(fh)
                 logger.info(f"Record end reached; returning for next record")
-                logger.debug(f"No XML entry is required for this type!")
                 record_count += 1
             case b"\x14":
                 token_type = "AU_HEADER32_T"
                 logger.info("Record start; parsing record contents")
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_header32_t = aurecord.au_header32_t(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.indent(audit, space="\t", level=0)
-                record = ET.SubElement(
-                    audit,
-                    "record",
-                    version=str(au_header32_t.version),
-                    event=str(au_header32_t.e_type),
-                    modifier=str(au_header32_t.e_mod),
-                    time=str(DT.fromtimestamp(au_header32_t.s).strftime('%c')),
-                    msec=f" + {str(au_header32_t.ms)} msec",
-                )
+                # ET.indent(audit, space="\t", level=0)
+                with open(f"{output_file}", "a+") as f:
+                    f.write(
+                        f'<record version="{str(au_header32_t.version)}" event="{str(au_header32_t.e_type)}" modifier="{str(au_header32_t.e_mod)}" time="{str(DT.fromtimestamp(au_header32_t.s).strftime("%c"))}" msec= " + {str(au_header32_t.ms)} msec" />\n')
             case b"\x15":
                 token_type = "AU_HEADER32_EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_header32_ex_t = aurecord.au_header32_ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x21":
                 # not actually used for anything?
                 token_type = "AU_DATA_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
 
                 au_data_t = aurecord.au_data_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x22":
                 token_type = "AUIPC_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 auipc_t = aurecord.auipc_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x23":
                 token_type = "AU_PATH_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_path_t = aurecord.au_path_t(fh)
                 logger.debug(f"Adding parsed record to XML object")
-                au_path = ET.SubElement(record, "path")
-                au_path.text = au_path_t.path.decode("utf-8")
+                with open(output_file, "a+") as f:
+                    f.write(f'<path>{str(au_path_t.path.decode("utf-8"))}</path>\n')
             case b"\x24":
                 token_type = "AU_SUBJECT32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_subject32_t = aurecord.au_subject32_t(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.SubElement(
-                    record,
-                    "subject",
-                    audit_id=str(au_subject32_t.auid),
-                    uid=str(au_subject32_t.euid),
-                    gid=str(au_subject32_t.egid),
-                    ruid=str(au_subject32_t.ruid),
-                    rgid=str(au_subject32_t.rgid),
-                    pid=str(au_subject32_t.pid),
-                    sid=str(au_subject32_t.sid),
-                    tid=(au_subject32_t.tid_port, au_subject32_t.tid_addr),
-                )
+                with open(output_file, "a+") as f:
+                    f.write(
+                        f'<subject audit-uid="{str(au_subject32_t.auid)}" uid="{str(au_subject32_t.euid)}" gid="{str(au_subject32_t.egid)}" ruid="{str(au_subject32_t.ruid)}" rgid="{str(au_subject32_t.rgid)}" pid="{str(au_subject32_t.pid)}" sid="{str(au_subject32_t.sid)}" tid="{str(au_subject32_t.tid_port) + str(au_subject32_t.tid_addr)}" />\n')
             case b"\x26":
                 token_type = "AU_PROC32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_proc32_t = aurecord.au_proc32_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x27":
                 token_type = "AU_RET32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_ret32_t = aurecord.au_ret32_t(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.indent(audit, space="\t", level=1)
-                ET.SubElement(
-                    record,
-                    "return",
-                    errval=str(au_ret32_t.status),
-                    retval=str(au_ret32_t.ret),
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<return errval="{str(au_ret32_t.status)}" retval="{str(au_ret32_t.ret)}"/>\n')
             case b"\x28":
                 token_type = "AU_TEXT_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_text_t = aurecord.au_text_t(fh)
-
-                ET.indent(audit, space="\t", level=1)
-                au_text = ET.SubElement(record, "text")
-                au_text.text = au_text_t.text.decode("utf-8")
+                au_text_text = au_text_t.text.decode("utf-8")
             case b"\x29":
                 token_type = "AU_OPAQUE_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_opaque_t = aurecord.au_opaque_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x2a":
                 token_type = "AUINADDR_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_inaddr_t = aurecord.au_inaddr_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x2b":
                 token_type = "AUIP_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 auip_t = aurecord.auip_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x2c":
                 token_type = "AUIPORT_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 auiport_t = aurecord.auiport_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x2d":
                 token_type = "AU_ARG32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_arg32_t = aurecord.au_arg32_t(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.SubElement(
-                    record,
-                    "argument",
-                    arg_num=str(au_arg32_t.no),
-                    value=str(au_arg32_t.val),
-                    desc=str(au_arg32_t.text.decode("utf-8")),
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<argument arg-num="{str(au_arg32_t.no)}" value="{str(au_arg32_t.val)}" desc="{str(au_arg32_t.text.decode("utf-8"))}"/>\n')
             case b"\x2e":
                 token_type = "AU_SOCKET_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_socket_t = aurecord.au_socket_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x2f":
                 token_type = "AU_SEQ_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_seq_t = aurecord.au_seq_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x31":
                 token_type = "AU_ATTR_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_attr_t = aurecord.au_attr_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x32":
                 token_type = "AUIPCPERM_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 auipcperm_t = aurecord.auipcperm_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x34":
                 token_type = "AU_PRIV_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_groups_t = aurecord.au_groups_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x38":
                 token_type = "AU_PRIV_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_priv_t = aurecord.au_priv_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x3c":
                 token_type = "AU_EXECARG_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_execarg_t = aurecord.au_execarg_t(fh)
 
-                au_execarg = ET.SubElement(record, "exec_args")
-                for items in au_execarg_t.text:
-                    arg = ET.SubElement(au_execarg, "arg")
-                    arg.text = items.decode("utf-8")
+                with open(output_file, "a+") as f:
+                    f.write('<exec_args>')
+                    for items in au_execarg_t.text:
+                        f.write(f'<arg>{items.decode("utf-8")}</arg>')
+                    f.write('</exec_args>\n')
             case b"\x3d":
                 token_type = "AU_EXECENV_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_execenv_t = aurecord.au_execenv_t(fh)
 
-                au_execenv = ET.SubElement(record, "exec_env")
-                for items in au_execenv_t.text:
-                    arg = ET.SubElement(au_execenv, "env")
-                    arg.text = items.decode("utf-8")
+                with open(output_file, "a+") as f:
+                    f.write('<exec_env>')
+                    for items in au_execenv_t.text:
+                        f.write(f'<env>{items.decode("utf-8")}</env>')
+                    f.write('</exec_env>\n')
             case b"\x3e":
                 token_type = "AU_ATTR32_t"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_attr32_t = aurecord.au_attr32_t(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.SubElement(
-                    record,
-                    "attribute",
-                    mode=str(au_attr32_t.mode),
-                    uid=str(au_attr32_t.uid),
-                    gid=str(au_attr32_t.gid),
-                    fsid=str(au_attr32_t.fsid),
-                    nodeid=str(au_attr32_t.nid),
-                    device=str(au_attr32_t.dev),
-                )
+                with open(f"{output_file}", "a+") as f:
+                    f.write(f'<attribute mode="{str(au_attr32_t.mode)}" uid="{str(au_attr32_t.uid)}" gid="{str(au_attr32_t.gid)}" fsid="{str(au_attr32_t.fsid)}" nodeid="{str(au_attr32_t.nid)}" device="{str(au_attr32_t.dev)}"/>\n')
             case b"\x52":
                 token_type = "AU_EXIT_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_exit_t = aurecord.au_exit_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x60":
                 token_type = "AU_ZONENAME_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_zonename_t = aurecord.au_zonename_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x71":
                 token_type = "AU_ARG64_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_arg64_t = aurecord.au_arg64_t(fh)
 
-                ET.SubElement(
-                    record, "argument",
-                    arg_num=str(au_arg64_t.no),
-                    value=hex(au_arg64_t.val),
-                    desc=(au_arg64_t.text.decode("utf-8"))
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<argument arg-num="{str(au_arg64_t.no)}" value="{str(au_arg64_t.val)}" desc="{str(au_arg64_t.text.decode("utf-8"))}"/>\n')
             case b"\x72":
                 token_type = "AU_RET64_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_ret64_t = aurecord.au_ret64_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x73":
                 token_type = "AU_ATTR64_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_attr64_t = aurecord.au_attr64_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x74":
                 token_type = "AU_HEADER64_t"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_header64_t = aurecord.au_header64_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x75":
                 token_type = "AU_SUBJECT64_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_subject64_t = aurecord.au_subject64_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x77":
                 token_type = "AU_PROCESS64_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_proc64_t = aurecord.au_proc64_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x79":
                 token_type = "AU_HEADER64_EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_header64_ex_t = aurecord.au_header64_ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7a":
                 token_type = "AU_SUBJECT32EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_subject32ex_t = aurecord.au_subject32ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7b":
                 token_type = "AU_PROC32EXT_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_proc32ex_t = aurecord.au_proc32ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7c":
                 token_type = "AU_SUBJECT64EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_subject64ex_t = aurecord.au_subject64ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7d":
                 token_type = "AU_PROC64EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_proc64ex_t = aurecord.au_proc64ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7e":
                 # TODO: Figure out the XML structure for this (if needed at all)
                 token_type = "AU_INADDR_EX_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_inaddr_ex_t = aurecord.au_inaddr_ex_t(fh)
-                logger.warning(f"XML support not (ye0) implemented for this type!")
+                logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x7f":
                 token_type = "AU_SOCKET_EX32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_socket_ex32_t = aurecord.au_socket_ex32_t(fh)
-                ET.SubElement(
-                    record, "socket",
-                    sock_dom=hex(au_socket_ex32_t.domain),
-                    atype=str(au_socket_ex32_t.atype),
-                    sock_type=hex(au_socket_ex32_t.type),
-                    lport=str(au_socket_ex32_t.l_port),
-                    laddr=str(au_socket_ex32_t.l_addr),
-                    faddr=str(au_socket_ex32_t.r_addr),
-                    fport=str(au_socket_ex32_t.r_port)
-                )
+
+                with open(output_file, "a+") as f:
+                    f.write(f'<socket sock-dom="{hex(au_socket_ex32_t.domain)}" sock-type="{hex(au_socket_ex32_t.atype)}" lport="{str(au_socket_ex32_t.l_port)}" laddr="{str(au_socket_ex32_t.l_addr)}" faddr="{str(au_socket_ex32_t.r_addr)}" fport="{str(au_socket_ex32_t.r_port)}" />\n')
             case b"\x80":
                 token_type = "AU_SOCKETINET32_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_socketinet32_t = aurecord.au_socketinet32_t(fh)
 
-                ET.SubElement(
-                    record, "socket_inet",
-                    type=str(au_socketinet32_t.family),
-                    port=str(au_socketinet32_t.port),
-                    addr=str(au_socketinet32_t.addr)
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<socket-inet type="{str(au_socketinet32_t.family)}" port="{str(au_socketinet32_t.port)}" addr="{str(au_socketinet32_t.addr)}" />\n')
             case b"\x81":
                 token_type = "AU_SOCKETINET128_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
 
                 au_socketinet128_t = aurecord.au_socketinet128_t(fh)
-
-                ET.SubElement(
-                    record, "socket_inet6",
-                    type=str(au_socketinet128_t.socket_family),
-                    port=str(au_socketinet128_t.l_port),
-                    addr=str(au_socketinet128_t.addr)
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<socket-inet6 type="{str(au_socketinet128_t.socket_family)}" port="{str(au_socketinet128_t.l_port)}" addr="{str(au_socketinet128_t.addr)}" />\n')
             case b"\x82":
                 token_type = "AU_UNIXSOCKET_T"
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
-                au_unixsocket_t_special = aurecord.au_unixsock_t_special(fh)
+                au_socketunix_t = aurecord.au_unixsock_t_special(fh)
 
                 logger.debug(f"Adding parsed record to XML object")
-                ET.SubElement(
-                    record,
-                    "socket-unix",
-                    type=str(au_unixsocket_t_special.family),
-                    port="",
-                    addr=str(au_unixsocket_t_special.addr.decode("utf-8")),
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<socket-unix type="{str(au_socketunix_t.family)}" port="" addr="{str(au_socketunix_t.addr.decode("utf-8"))}" />\n')
             case b"\xed":
                 token_type = "AUT_IDENTITY_INFO 0xED"
                 logger.info("macOS specific record encountered")
-                logger.info(f"Type is: {'0x' + header_type.hex()} aka {token_type}")
+                logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
 
                 au_identity_info = aurecord.au_identity_info(fh)
                 logger.debug("Adding parsed record to XML object")
 
-                ET.SubElement(
-                    record, "identity",
-                    signer_type=str(au_identity_info.signer_type),
-                    signing_id=(au_identity_info.signing_id.decode("utf-8")),
-                    signing_id_truncated=str(au_identity_info.signing_id_trunc),
-                    team_id=(au_identity_info.team_id.decode("utf-8")),
-                    team_id_truncated=str(au_identity_info.team_id_trunc),
-                    cdhash=(au_identity_info.cdhash.hex())
-                )
+                with open(output_file, "a+") as f:
+                    f.write(f'<identity signer-type="{str(au_identity_info.signer_type)}" signing-id="{au_identity_info.signing_id.decode("utf-8")}" signing-id-truncated="{str(au_identity_info.signing_id_trunc)}" team-id="{au_identity_info.team_id.decode("utf-8")}" team-id-truncated="{str(au_identity_info.team_id_trunc)}" cdhash="{au_identity_info.cdhash.hex()}" />\n')
             case b"":
                 logger.info("End of file reached; no errors occurred getting here")
                 logger.info("Exiting loop on clean state & writing collected XML to disk")
-                ET.indent(audit, space="\t", level=0)
+                with open(f"{output_file}", "a+") as f:
+                    f.write("</audit>")
                 end_time = TT()
                 # Calculate and display running time:
                 run_time = end_time - start_time
-                print(f"[-] Time spent crunching records: {run_time:.2f} seconds")
+                print(f"\n[-] Time spent crunching records: {run_time:.2f} seconds")
+                # return amount of records parsed
+                print(f"[-] Final record count is: {record_count}")
                 not_empty = False
+                bar.finish()
             case _:
-                logger.error(f"Encountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
-                logger.error(f"Writing collected XML to disk; then exiting on non-zero exit code")
+                logger.error(
+                    f"Encountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
+                logger.error(
+                    f"Writing collected XML to disk; then exiting on non-zero exit code")
                 clean = False
 
-    logger.debug("Attempting to open XML output file: xml-dump.xml")
-
-    with open("xml-dump.xml", "w+") as f:
-        print(f"[-] Final record count is: {record_count}")
-        logger.debug("Writing XML version information to disk")
-        f.write("<?xml version='1.0'?>\n")
-        logger.info("Writing collected XML to disk")
-        f.write(ET.tostring(audit, method="xml").decode("utf-8"))
-        logger.info("Wrote collected XML to disk")
-        if not clean:
-            logger.critical("XMl is not completed due to prior error!")
-            logger.critical("Check logs and output for possible reasons for premature exit")
-            exit -1
+    if not clean:
+        logger.critical("XMl is not completed due to prior error!")
+        logger.critical(
+            "Check logs and output for possible reasons for premature exit")
+        exit - 1
     logger.info("Exiting on exit code 0; all good to go!")
 
 
