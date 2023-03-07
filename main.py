@@ -741,9 +741,8 @@ typedef struct {
 
 
 class Bar(Bar):
-    message = "Bytes read"
     fill = "*"
-    suffix = '%(remaining)d Bytes - %(elapsed)d Seconds'
+    suffix = '%(remaining)d Bytes left - %(elapsed)d Seconds elapsed'
 
 
 def print_items(parsed_record):
