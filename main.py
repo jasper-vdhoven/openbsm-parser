@@ -909,7 +909,7 @@ def main():
                 auipcperm_t = aurecord.auipcperm_t(fh)
                 logger.warning(f"XML support not (yet) implemented for this type!")
             case b"\x34":
-                token_type = "AU_PRIV_T"
+                token_type = "AU_GROUPS_T"
                 logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_groups_t = aurecord.au_groups_t(fh)
