@@ -1084,12 +1084,14 @@ def main():
                 print(f"[-] Final record count is: {record_count}")
                 not_empty = False
                 bar.finish()
+                fh.close()
             case _:
                 logger.error(
                     f"Encountered invalid record byte: {header_type}; this might be because it is not (yet) supported or a bug!")
                 logger.error(
                     f"Writing collected XML to disk; then exiting on non-zero exit code")
                 clean = False
+                fh.close()
 
     if not clean:
         logger.critical("XMl is not completed due to prior error!")
