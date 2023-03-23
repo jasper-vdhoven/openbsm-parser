@@ -22,6 +22,7 @@ for level, format_str in custom_level_formats.items():
 
 # Create Logger
 logger = logging.getLogger('OpenBSM-Parser')
+# TODO: set logging level via CLI flag / otherwise leave default to ERROR
 logger.setLevel(logging.ERROR)
 
 # Set format of log messages
@@ -740,15 +741,14 @@ def main():
     aurecord.load(cdef, compiled=True)
 
     # Define output file name
-    # TODO: allow users to pass their desired file names
-    output_file = f"{str(argv[1]).split('/')[-1]}-XML-dump.xml"
-    print(output_file)
+    # TODO: allow users to pass their desired file names via a flag and otherwise just use the argv[1] input file name as output
+    output_file = f"{str(argv[2])}"
 
     # Progress bar creation
     bar = Bar('Bytes read', max=int(os.path.getsize(argv[1])))
 
-    if len(argv) != 2:
-        exit("usage: main.py <audit_trail>")
+    if len(argv) < 2:
+        exit("usage: main.py <audit_trail> <output_file>")
 
     try:
         logger.info(f'Attempting to open file: {argv[1]}')
@@ -787,6 +787,8 @@ def main():
                 au_trailer_t = aurecord.au_trailer_t(fh)
                 logger.info(f"Record end reached; returning for next record")
                 record_count += 1
+                with open(f"{output_file}", "a+") as f:
+                    f.write("</record>\n")
             case b"\x14":
                 token_type = "AU_HEADER32_T"
                 logger.info("Record start; parsing record contents")
@@ -796,7 +798,7 @@ def main():
                 logger.debug(f"Writing record to disk as XML")
                 with open(f"{output_file}", "a+") as f:
                     f.write(
-                        f'<record version="{au_header32_t.version}" event="{au_header32_t.e_type}" modifier="{au_header32_t.e_mod}" time="{DT.fromtimestamp(au_header32_t.s).strftime("%c")}" msec= " + {au_header32_t.ms} msec" />\n')
+                        f'<record version="{au_header32_t.version}" event="{au_header32_t.e_type}" modifier="{au_header32_t.e_mod}" time="{DT.fromtimestamp(au_header32_t.s).strftime("%c")}" msec= " + {au_header32_t.ms} msec" >\n')
             case b"\x15":
                 token_type = "AU_HEADER32_EX_T"
                 logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
