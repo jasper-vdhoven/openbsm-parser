@@ -6,6 +6,26 @@ from datetime import datetime as DT
 from time import time as TT
 from progress.bar import Bar
 import os.path
+import argparse
+
+
+# define arg parser
+args_parser = argparse.ArgumentParser(prog='OpenBSM Parser',
+                                      description='A Python parser for the OpenBSM file format utilising Dissect.Cstruct parsing logic',)
+args_parser.add_argument('-i', '--input', action='store', nargs=1, required=True,
+                         metavar='./20211014090822.20211014090900', help='Path to location of OpenBSM audit log')
+args_parser.add_argument('-o', '--output', action='store', nargs=1, metavar='./20211014090822.20211014090900.xml',
+                         help='Path to output file for parsed records. If no output is specified, the input file name will be used and extended with ".xml"')
+args_parser.add_argument('-p', '--passwd', action='store', nargs=1, metavar='./passwd',
+                         help='Path to the system of origin\'s /etc/passwd equivalent file')
+args_parser.add_argument('-g', '--groups', action='store', nargs=1, metavar='./groups',
+                         help='Path to the system of origin\'s /etc/groups equivalent file')
+args_parser.add_argument('-l', '--loglevel', action='store', nargs=1,
+                         metavar='ERROR', help='Log level setter, default value is ERROR. Valid options are: DEBUG, INFO, WARN, ERROR, and CRIT')
+args_parser.add_argument('-f', '--logfile', action='store', nargs=1, metavar='./output-log.log',
+                         help='File path of where to write the log file to. If no value is specified the input file will be used and extended with ".log"')
+
+active_args = args_parser.parse_args()
 
 # Set logging info
 # Log level formatting
@@ -22,13 +42,31 @@ for level, format_str in custom_level_formats.items():
 
 # Create Logger
 logger = logging.getLogger('OpenBSM-Parser')
-# TODO: set logging level via CLI flag / otherwise leave default to ERROR
-logger.setLevel(logging.ERROR)
+match active_args.loglevel[0]:
+    case "DEBUG":
+        logger.setLevel(logging.DEBUG)
+    case "INFO":
+        logger.setLevel(logging.INFO)
+    case "WARN":
+        logger.setLevel(logging.WARN)
+    case "ERROR":
+        logger.setLevel(logging.WARN)
+    case "CRIT":
+        logger.setLevel(logging.CRITICAL)
+    case _:
+        logger.setLevel(logging.ERROR)
+        print(
+            f"[!] invalid logging level: {active_args.loglevel[0]}; setting logging level to ERROR")
 
 # Set format of log messages
+# TODO: make the time appear here again, it apperas to be missing in actual logging output
 logging_format = logging.Formatter(
     "%(levelname)s - %(asctime)s - %(name)s - %(message)s")
-logging.basicConfig(filename="parser_log.log", encoding="utf-8")
+if active_args.logfile:
+    logging.basicConfig(filename=active_args.logfile[0], encoding="utf-8")
+else:
+    logging.basicConfig(
+        filename=f"{active_args.input[0]}.log", encoding='utf-8')
 
 cdef = """
 /*
@@ -741,20 +779,19 @@ def main():
     aurecord.load(cdef, compiled=True)
 
     # Define output file name
-    # TODO: allow users to pass their desired file names via a flag and otherwise just use the argv[1] input file name as output
-    output_file = f"{str(argv[2])}"
+    if active_args.output:
+        output_file = active_args.output[0]
+    else:
+        output_file = f"{active_args.input[0]}.xml"
 
     # Progress bar creation
-    bar = Bar('Bytes read', max=int(os.path.getsize(argv[1])))
-
-    if len(argv) < 2:
-        exit("usage: main.py <audit_trail> <output_file>")
+    bar = Bar('Bytes read', max=int(os.path.getsize(active_args.input[0])))
 
     try:
-        logger.info(f'Attempting to open file: {argv[1]}')
-        fh = open(argv[1], "rb")
+        logger.info(f'Attempting to open file: {active_args.input[0]}')
+        fh = open(active_args.input[0], "rb")
     except FileNotFoundError:
-        logging.error(f"Could not open file: {argv[1]}")
+        logging.error(f"Could not open file: {active_args.input[0]}")
         raise FileNotFoundError
 
     print("[-] Valid file path given; starting parser")
@@ -773,7 +810,6 @@ def main():
         header_type = fh.read(1)
         bar.goto(fh.tell())
 
-        # TODO: make this *a lot* faster; parsing files in the MegaBytes takes forever to do
         match header_type:
             case b"\x00":
                 token_type = "AUINVALID_T"
