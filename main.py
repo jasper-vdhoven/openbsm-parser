@@ -42,21 +42,24 @@ for level, format_str in custom_level_formats.items():
 
 # Create Logger
 logger = logging.getLogger('OpenBSM-Parser')
-match active_args.loglevel[0]:
-    case "DEBUG":
-        logger.setLevel(logging.DEBUG)
-    case "INFO":
-        logger.setLevel(logging.INFO)
-    case "WARN":
-        logger.setLevel(logging.WARN)
-    case "ERROR":
-        logger.setLevel(logging.WARN)
-    case "CRIT":
-        logger.setLevel(logging.CRITICAL)
-    case _:
-        logger.setLevel(logging.ERROR)
-        print(
-            f"[!] invalid logging level: {active_args.loglevel[0]}; setting logging level to ERROR")
+if active_args.loglevel:
+    match active_args.loglevel[0]:
+        case "DEBUG":
+            logger.setLevel(logging.DEBUG)
+        case "INFO":
+            logger.setLevel(logging.INFO)
+        case "WARN":
+            logger.setLevel(logging.WARN)
+        case "ERROR":
+            logger.setLevel(logging.WARN)
+        case "CRIT":
+            logger.setLevel(logging.CRITICAL)
+        case _:
+            logger.setLevel(logging.ERROR)
+            print(
+                f"[!] invalid logging level: {active_args.loglevel[0]}; setting logging level to ERROR")
+else:
+    logger.setLevel(logging.ERROR)
 
 # Set format of log messages
 # TODO: make the time appear here again, it apperas to be missing in actual logging output
