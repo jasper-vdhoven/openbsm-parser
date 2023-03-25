@@ -774,6 +774,19 @@ class Bar(Bar):
     suffix = '%(remaining)d Bytes left - %(elapsed)d Seconds elapsed'
 
 
+def uid_to_name(fh):
+    passwd_dict = {}
+    with open(fh, "r+") as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            fields = line.split(':')
+            name = fields[0]
+            uid = int(fields[2])
+            passwd_dict[uid] = name
+    return passwd_dict
+
+
 def main():
     aurecord = cstruct(endian=">")
     aurecord.load(cdef, compiled=True)
@@ -801,6 +814,12 @@ def main():
     record_count = 0
     with open(f"{output_file}", "w+") as f:
         f.write("<?xml version='1.0'?>\n<audit>\n")
+
+    # passwd parsing testing location
+    if active_args.passwd:
+        passwd_dict = uid_to_name(active_args.passwd[0])
+    if active_args.groups:
+        groups_dict = uid_to_name(active_args.groups[0])
 
     # start perf timer HERE
     start_time = TT()
@@ -866,10 +885,23 @@ def main():
                 logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
                 logger.debug(f"Parsing memory for type: {token_type}")
                 au_subject32_t = aurecord.au_subject32_t(fh)
+                if au_subject32_t.auid == 4294967295:
+                    au_subject32_t.auid = 0
                 logger.debug(f"Writing record to disk as XML")
                 with open(output_file, "a+") as f:
-                    f.write(
-                        f'<subject audit-uid="{au_subject32_t.auid}" uid="{au_subject32_t.euid}" gid="{au_subject32_t.egid}" ruid="{au_subject32_t.ruid}" rgid="{au_subject32_t.rgid}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
+                    if active_args.passwd and active_args.groups:
+                        print("both passwd & groups")
+                        f.write(
+                            f'<subject audit-uid="{passwd_dict.get(au_subject32_t.auid)}" uid="{passwd_dict.get(au_subject32_t.euid)}" gid="{groups_dict.get(au_subject32_t.egid)}" ruid="{passwd_dict.get(au_subject32_t.ruid)}" rgid="{groups_dict.get(au_subject32_t.rgid)}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
+                    elif active_args.passwd:
+                        f.write(
+                            f'<subject audit-uid="{passwd_dict.get(au_subject32_t.auid)}" uid="{passwd_dict.get(au_subject32_t.euid)}" gid="{au_subject32_t.egid}" ruid="{passwd_dict.get(au_subject32_t.ruid)}" rgid="{au_subject32_t.rgid}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
+                    elif active_args.groups:
+                        f.write(
+                            f'<subject audit-uid="{au_subject32_t.auid}" uid="{au_subject32_t.euid}" gid="{groups_dict.get(au_subject32_t.egid)}" ruid="{au_subject32_t.ruid}" rgid="{groups_dict.get(au_subject32_t.rgid)}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
+                    else:
+                        f.write(
+                            f'<subject audit-uid="{au_subject32_t.auid}" uid="{au_subject32_t.euid}" gid="{au_subject32_t.egid}" ruid="{au_subject32_t.ruid}" rgid="{au_subject32_t.rgid}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
             case b"\x26":
                 token_type = "AU_PROC32_T"
                 logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
@@ -985,7 +1017,14 @@ def main():
                 au_attr32_t = aurecord.au_attr32_t(fh)
                 logger.debug(f"Writing record to disk as XML")
                 with open(f"{output_file}", "a+") as f:
-                    f.write(f'<attribute mode="{au_attr32_t.mode}" uid="{au_attr32_t.uid}" gid="{au_attr32_t.gid}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
+                    if active_args.passwd and active_args.groups:
+                        f.write(f'<attribute mode="{au_attr32_t.mode}" uid="{passwd_dict.get(au_attr32_t.uid)}" gid="{groups_dict.get(au_attr32_t.gid)}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
+                    elif active_args.passwd:
+                        f.write(f'<attribute mode="{au_attr32_t.mode}" uid="{passwd_dict.get(au_attr32_t.uid)}" gid="{au_attr32_t.gid}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
+                    elif active_args.groups:
+                        f.write(f'<attribute mode="{au_attr32_t.mode}" uid="{au_attr32_t.uid}" gid="{passwd_dict.get(au_attr32_t.gid)}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
+                    else:
+                        f.write(f'<attribute mode="{au_attr32_t.mode}" uid="{au_attr32_t.uid}" gid="{au_attr32_t.gid}" fsid="{au_attr32_t.fsid}" nodeid="{au_attr32_t.nid}" device="{au_attr32_t.dev}"/>\n')
             case b"\x52":
                 token_type = "AU_EXIT_T"
                 logger.info(f"Byte: {'0x' + header_type.hex()} - {token_type}")
