@@ -2,7 +2,7 @@
 
 An OpenBSM audit trail parser utilising dissect.cstruct to parse its binary log files that aims to be usable on Linux as a stand-alone replacement for the existing FreeBSD auditd tooling.
 
-This originated from my internship where I did reseearch into what kind of log sources the FreeBSD operating system had on offer. Out of this research came one log source with a lot of potential: auditd / OpenBSM. There was only one downside; the tooling was primarily designed to function on either macOS or FreeBSD. That's when the idea arose of writing a parser utilising the Fox-IT Dissect framework and its Cstruct plug-in.
+This originated from my internship where I did research into what kind of log sources the FreeBSD operating system had on offer. Out of this research came one log source with a lot of potential: auditd / OpenBSM. There was only one downside; the tooling was primarily designed to function on either macOS or FreeBSD. That's when the idea arose of writing a parser utilising the Fox-IT Dissect framework and its Cstruct plug-in.
 
 Dissect.cstruct allows you to easily parse binary data according to the C struct that defined it. This makes parsing data as easy as `ctrl` + `C` & `ctrl` +`V` as far as the structs are concerned that need to be parsed. This for example looks the following for some of the structs in OpenBSM:
 
