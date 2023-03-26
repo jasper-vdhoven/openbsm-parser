@@ -800,9 +800,6 @@ def main():
     else:
         output_file = f"{active_args.input[0]}.xml"
 
-    # Progress bar creation
-    bar = Bar('Bytes read', max=int(os.path.getsize(active_args.input[0])))
-
     try:
         logger.info(f'Attempting to open file: {active_args.input[0]}')
         fh = open(active_args.input[0], "rb")
@@ -823,6 +820,9 @@ def main():
         passwd_dict = uid_to_name(active_args.passwd[0])
     if active_args.groups:
         groups_dict = uid_to_name(active_args.groups[0])
+
+    # Progress bar creation
+    bar = Bar('Bytes read', max=int(os.path.getsize(active_args.input[0])))
 
     # start perf timer HERE
     start_time = TT()
@@ -893,7 +893,6 @@ def main():
                 logger.debug(f"Writing record to disk as XML")
                 with open(output_file, "a+") as f:
                     if active_args.passwd and active_args.groups:
-                        print("both passwd & groups")
                         f.write(
                             f'<subject audit-uid="{passwd_dict.get(au_subject32_t.auid)}" uid="{passwd_dict.get(au_subject32_t.euid)}" gid="{groups_dict.get(au_subject32_t.egid)}" ruid="{passwd_dict.get(au_subject32_t.ruid)}" rgid="{groups_dict.get(au_subject32_t.rgid)}" pid="{au_subject32_t.pid}" sid="{au_subject32_t.sid}" tid="{au_subject32_t.tid_port + au_subject32_t.tid_addr}" />\n')
                     elif active_args.passwd:
