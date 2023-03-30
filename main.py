@@ -1161,7 +1161,7 @@ def main():
         logger.critical("XMl is not completed due to prior error!")
         logger.critical(
             "Check logs and output for possible reasons for premature exit")
-        exit - 1
+        raise SystemExit("Something went wrong! Check the log file for errors")
     logger.info("Exiting on exit code 0; all good to go!")
 
 
